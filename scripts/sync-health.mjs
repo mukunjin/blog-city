@@ -34,7 +34,7 @@ const healthFile = path.join(root, 'data', 'health.json');
 const API_URL = 'https://indi.blog/api/blogs.json';
 const USER_AGENT =
   'Mozilla/5.0 (compatible; BlogCityBot/1.0; +https://github.com/timqian/chinese-independent-blogs)';
-const TIMEOUT_MS = 30_000;
+const TIMEOUT_MS = 45_000;
 // their own renderer treats a short payload as a broken deployment, and so do we
 const MIN_BLOGS = 1000;
 
@@ -45,15 +45,29 @@ function toUnix(iso) {
 }
 
 async function fetchStatus() {
-  const res = await fetch(API_URL, {
-    headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  const blogs = Array.isArray(data?.blogs) ? data.blogs : [];
-  if (blogs.length < MIN_BLOGS) throw new Error(`only ${blogs.length} blogs in the response`);
-  return blogs;
+  // The endpoint sits behind Cloudflare and is occasionally slow to answer from
+  // a home connection; one request, three tries, then give up cleanly.
+  let last;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(API_URL, {
+        headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const blogs = Array.isArray(data?.blogs) ? data.blogs : [];
+      if (blogs.length < MIN_BLOGS) throw new Error(`only ${blogs.length} blogs in the response`);
+      return blogs;
+    } catch (err) {
+      last = err;
+      if (attempt < 3) {
+        console.warn(`  attempt ${attempt}/3 failed (${err.message}), retrying…`);
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    }
+  }
+  throw last;
 }
 
 async function readPrevious() {

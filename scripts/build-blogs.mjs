@@ -14,19 +14,34 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
 const sibling = path.resolve(root, '..', 'chinese-independent-blogs');
 
-const RAW = 'https://raw.githubusercontent.com/timqian/chinese-independent-blogs/master';
+// Two mirrors for the same repo: raw.githubusercontent is blocked on plenty of
+// Chinese networks, jsDelivr is not. Tried in order, first one that answers wins.
+const MIRRORS = [
+  { label: 'jsdelivr', base: 'https://cdn.jsdelivr.net/gh/timqian/chinese-independent-blogs@master' },
+  { label: 'github:raw', base: 'https://raw.githubusercontent.com/timqian/chinese-independent-blogs/master' },
+];
 const remote = process.argv.includes('--remote');
 
-async function fromRemote(file) {
-  const res = await fetch(`${RAW}/${file}`);
-  if (!res.ok) throw new Error(`${file}: HTTP ${res.status}`);
-  return res.text();
+async function fromMirror(file) {
+  const failures = [];
+  for (const m of MIRRORS) {
+    try {
+      const res = await fetch(`${m.base}/${file}`, { signal: AbortSignal.timeout(20_000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      if (!text || text.length < 1000) throw new Error('suspiciously short response');
+      return { text, label: m.label };
+    } catch (err) {
+      failures.push(`${m.label}: ${err.message}`);
+    }
+  }
+  throw new Error(`${file} — ${failures.join('; ')}`);
 }
 
 async function load() {
   if (remote) {
-    const [csvText, readmeText] = await Promise.all([fromRemote('blogs-original.csv'), fromRemote('README.md')]);
-    return { csvText, readmeText, label: 'github:raw' };
+    const [csv, readme] = await Promise.all([fromMirror('blogs-original.csv'), fromMirror('README.md')]);
+    return { csvText: csv.text, readmeText: readme.text, label: csv.label };
   }
   try {
     const [csvText, readmeText] = await Promise.all([
@@ -35,9 +50,9 @@ async function load() {
     ]);
     return { csvText, readmeText, label: 'local-clone' };
   } catch (err) {
-    console.warn(`! local clone not readable (${err.message}), falling back to GitHub raw`);
-    const [csvText, readmeText] = await Promise.all([fromRemote('blogs-original.csv'), fromRemote('README.md')]);
-    return { csvText, readmeText, label: 'github:raw' };
+    console.warn(`! local clone not readable (${err.message}), going upstream`);
+    const [csv, readme] = await Promise.all([fromMirror('blogs-original.csv'), fromMirror('README.md')]);
+    return { csvText: csv.text, readmeText: readme.text, label: csv.label };
   }
 }
 
