@@ -9,7 +9,7 @@ import type { CityBuilding, CityLayout, CityRoad, CityTree } from "./types";
 // from the centre outwards, and blogs are taken freshest-first, so the newest
 // writing always ends up downtown and the quiet ones drift to the edge.
 
-const GAP = 11.5; // minimum air between two towers
+const GAP = 15; // minimum air between two towers
 const MAX_ATTEMPTS = 96;
 const HASH = 18;
 
@@ -48,7 +48,7 @@ export function buildCity(blogs: Blog[]): CityLayout {
   // area budget → radius; the packing factor stays low on purpose, the city
   // should read as scattered towers with air between them
   const area = feet.reduce((sum, f) => sum + (f.w + GAP) * (f.d + GAP), 0);
-  const radius = Math.max(60, Math.sqrt(area / (Math.PI * 0.255)));
+  const radius = Math.max(60, Math.sqrt(area / (Math.PI * 0.205)));
 
   // ── road plan ──
   const rings = RING_FRACS.map((f) => radius * f);
@@ -183,7 +183,7 @@ export function buildCity(blogs: Blog[]): CityLayout {
 // Two passes: a formal line of trees along every avenue and ring, then loose
 // clusters in the gaps. Both reject anything that would clip a tower.
 
-const TREE_MIN_DIST = 15.5;
+const TREE_MIN_DIST = 19;
 const TREE_HASH = 9;
 
 function plantTrees(
@@ -257,7 +257,7 @@ function plantTrees(
     const a = spokeBase + (s * Math.PI * 2) / SPOKES;
     const dx = Math.cos(a);
     const dz = Math.sin(a);
-    for (let t = PLAZA + 34; t < reach - 10; t += 19) {
+    for (let t = PLAZA + 34; t < reach - 10; t += 24) {
       for (const sign of [-1, 1]) {
         const jitterA = (rand01(Math.round(t * 13 + s * 97 + sign * 7)) - 0.5) * 2.4;
         const x = dx * t - dz * (sideOff + jitterA) * sign;
@@ -271,7 +271,7 @@ function plantTrees(
   for (const r of rings) {
     const rIn = r - (RING_WIDTH / 2 + 3.6);
     const rOut = r + (RING_WIDTH / 2 + 3.6);
-    const steps = Math.round((Math.PI * 2 * r) / 21);
+    const steps = Math.round((Math.PI * 2 * r) / 26);
     for (let i = 0; i < steps; i++) {
       const a = (i / steps) * Math.PI * 2 + 0.13;
       add(Math.cos(a) * rIn, Math.sin(a) * rIn);

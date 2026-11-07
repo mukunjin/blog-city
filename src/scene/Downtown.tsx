@@ -3,97 +3,80 @@ import * as THREE from "three";
 import type { CityLayout } from "../lib/types";
 
 // ─── Downtown ──────────────────────────────────────────────────
-// A roundabout in the middle of town with a pixel sign standing on it, plus
-// traffic running the avenues. Everything here is deliberately crude: boxes,
-// one instanced mesh each, no text geometry, no font file.
+// A roundabout in the middle of town, with a signpost standing on it: four
+// boards around a column, each carrying the city's name. The lettering is
+// painted into a canvas once and used as a texture — real type, no font file,
+// one draw call for the whole sign.
 
 const ASPHALT = "#171d29";
 const ISLAND = "#0d1512";
 const STONE = "#141a24";
 const SIGN = "#ffcf7a";
-const CELL = 2.6;
-const DEPTH = 2.2;
 
-// 5×7 bitmap font — only the letters the sign needs
-const GLYPHS: Record<string, string[]> = {
-  B: ["11110", "10001", "10001", "11110", "10001", "10001", "11110"],
-  L: ["10000", "10000", "10000", "10000", "10000", "10000", "11111"],
-  O: ["01110", "10001", "10001", "10001", "10001", "10001", "01110"],
-  G: ["01110", "10001", "10000", "10000", "10011", "10001", "01110"],
-  C: ["01110", "10001", "10000", "10000", "10000", "10001", "01110"],
-  I: ["11111", "00100", "00100", "00100", "00100", "00100", "11111"],
-  T: ["11111", "00100", "00100", "00100", "00100", "00100", "00100"],
-  Y: ["10001", "10001", "01010", "00100", "00100", "00100", "00100"],
-};
+const BOARD_W = 44;
+const BOARD_H = 18;
+const BOARD_Y = 23; // board block starts on top of the column
 
-interface Cell {
-  x: number;
-  y: number;
-}
+function signTexture(): THREE.CanvasTexture {
+  const w = 1024;
+  const h = Math.round((w * BOARD_H) / BOARD_W);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
 
-function layoutText(lines: string[]): Cell[] {
-  const cells: Cell[] = [];
-  const lineH = 8; // 7 rows + 1 gap
-  lines.forEach((line, li) => {
-    const chars = [...line];
-    const width = chars.length * 6 - 1;
-    let col = 0;
-    for (const ch of chars) {
-      const glyph = GLYPHS[ch];
-      if (glyph) {
-        for (let r = 0; r < 7; r++) {
-          for (let c = 0; c < 5; c++) {
-            if (glyph[r][c] === "1") {
-              cells.push({
-                x: (col + c - width / 2 + 0.5) * CELL,
-                y: (lines.length * lineH - 1 - li * lineH - r - 0.5) * CELL,
-              });
-            }
-          }
-        }
-      }
-      col += 6;
-    }
-  });
-  return cells;
+  // board
+  ctx.fillStyle = "#0a1018";
+  ctx.fillRect(0, 0, w, h);
+  ctx.strokeStyle = "rgba(255, 207, 122, 0.55)";
+  ctx.lineWidth = 6;
+  ctx.strokeRect(5, 5, w - 10, h - 10);
+
+  // lettering, with a soft glow so it reads as lit rather than printed
+  ctx.fillStyle = SIGN;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  const size = Math.round(h * 0.52);
+  ctx.font = `700 ${size}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
+  if ("letterSpacing" in ctx) (ctx as unknown as { letterSpacing: string }).letterSpacing = "8px";
+  ctx.shadowColor = "rgba(255, 190, 90, 0.85)";
+  ctx.shadowBlur = size * 0.35;
+  ctx.fillText("BLOG CITY", w / 2, h * 0.53);
+  ctx.shadowBlur = 0;
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
 }
 
 export function Roundabout({ layout }: { layout: CityLayout }) {
   const plaza = layout.plaza;
 
   const sign = useMemo(() => {
-    const cells = layoutText(["BLOG", "CITY"]);
-    // two crossed faces, so the sign reads from any direction
-    const faces = [0, Math.PI / 2];
-    const geo = new THREE.BoxGeometry(1, 1, 1);
-    const mat = new THREE.MeshBasicMaterial({ color: SIGN });
-    const mesh = new THREE.InstancedMesh(geo, mat, cells.length * faces.length);
+    const geo = new THREE.PlaneGeometry(BOARD_W, BOARD_H);
+    const mat = new THREE.MeshBasicMaterial({ map: signTexture() });
+    // the four faces of a hollow box: at any angle you see at least one head-on
+    const half = BOARD_W / 2;
+    const faces: [number, number, number][] = [
+      [0, 0, half],
+      [Math.PI, 0, -half],
+      [Math.PI / 2, half, 0],
+      [-Math.PI / 2, -half, 0],
+    ];
+    const mesh = new THREE.InstancedMesh(geo, mat, faces.length);
     const m = new THREE.Matrix4();
     const p = new THREE.Vector3();
     const q = new THREE.Quaternion();
-    const sc = new THREE.Vector3(CELL * 0.9, CELL * 0.9, DEPTH);
-    const c = new THREE.Color();
+    const sc = new THREE.Vector3(1, 1, 1);
     const up = new THREE.Vector3(0, 1, 0);
-    let i = 0;
-    // stand the sign on the plinth rather than in mid air
-    const lowest = Math.min(...cells.map((c) => c.y));
-    const dy = 1.95 - lowest;
-    faces.forEach((a) => {
-      q.setFromAxisAngle(up, a);
-      for (const cell of cells) {
-        const cos = Math.cos(a);
-        const sin = Math.sin(a);
-        p.set(cell.x * cos, cell.y + dy, cell.x * sin);
-        m.compose(p, q, sc);
-        mesh.setMatrixAt(i, m);
-        // slightly uneven brightness, like an old bulb matrix
-        c.setScalar(0.72 + ((i * 37) % 23) / 60);
-        mesh.setColorAt(i, c);
-        i++;
-      }
+    faces.forEach(([rotY, x, z], i) => {
+      q.setFromAxisAngle(up, rotY);
+      p.set(x, BOARD_Y, z);
+      m.compose(p, q, sc);
+      mesh.setMatrixAt(i, m);
     });
     mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.frustumCulled = false;
     return mesh;
   }, []);
@@ -112,10 +95,20 @@ export function Roundabout({ layout }: { layout: CityLayout }) {
         <meshBasicMaterial color={ISLAND} />
       </mesh>
 
-      {/* a low plinth under the sign */}
+      {/* plinth + column, with the sign sitting on top */}
       <mesh position={[0, 0.9, 0]}>
-        <cylinderGeometry args={[plaza * 0.42, plaza * 0.44, 1.8, 24]} />
+        <cylinderGeometry args={[plaza * 0.24, plaza * 0.26, 1.8, 28]} />
         <meshBasicMaterial color={STONE} />
+      </mesh>
+      <mesh position={[0, 7.9, 0]}>
+        <boxGeometry args={[6.8, 12.2, 6.8]} />
+        <meshBasicMaterial color={STONE} />
+      </mesh>
+
+      {/* the cap keeps the hollow box from reading as a tube from above */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, BOARD_Y + BOARD_H / 2, 0]}>
+        <planeGeometry args={[BOARD_W, BOARD_W]} />
+        <meshBasicMaterial color="#0a1018" />
       </mesh>
 
       <primitive object={sign} />
