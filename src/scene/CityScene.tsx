@@ -4,6 +4,7 @@ import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import Buildings from "./Buildings";
+import { Roads, Trees } from "./Streets";
 import { Ground, Moon, PALETTE, Sky, Stars } from "./Backdrop";
 import type { CityBuilding, CityLayout } from "../lib/types";
 import { useReducedMotion } from "../lib/usePresence";
@@ -252,6 +253,8 @@ export default function CityScene({
       <Moon />
       <ambientLight intensity={0.5} />
       <Ground layout={layout} fog={fog} />
+      <Roads layout={layout} />
+      <Trees layout={layout} />
       <Buildings layout={layout} onHover={onHover} onSelect={onSelect} fog={fog} />
       <SelectionMarker building={selected} />
       <HoverMarker building={hovered} />

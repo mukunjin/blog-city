@@ -22,5 +22,28 @@ export interface CityBuilding {
 
 export interface CityLayout {
   buildings: CityBuilding[];
+  roads: CityRoad[];
+  trees: CityTree[];
   extent: { minX: number; maxX: number; minZ: number; maxZ: number };
+}
+
+export interface CityRoad {
+  /** "spoke" runs from the centre outwards, "ring" is a full circle */
+  kind: "spoke" | "ring";
+  /** radians for a spoke, radius for a ring */
+  at: number;
+  width: number;
+  /** spokes only: radial extent */
+  from: number;
+  to: number;
+}
+
+export interface CityTree {
+  x: number;
+  z: number;
+  scale: number;
+  rot: number;
+  /** 0 = broadleaf, 1 = conifer */
+  kind: number;
+  tint: number;
 }

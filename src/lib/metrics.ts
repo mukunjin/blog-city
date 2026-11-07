@@ -23,8 +23,6 @@ export interface BuildingMetrics {
   height: number;
   /** 0..1 share of lit windows */
   lit: number;
-  /** 0..1 how much of its lot the building fills */
-  fill: number;
   /** 0..1 tag breadth */
   breadth: number;
   seed: number;
@@ -53,7 +51,6 @@ export function buildingMetrics(blog: Blog): BuildingMetrics {
     return {
       height: 9 + jitter * 13,
       lit: 0.015 + jitter * 0.02,
-      fill: 0.56 + jitter * 0.1,
       breadth,
       seed,
     };
@@ -63,7 +60,6 @@ export function buildingMetrics(blog: Blog): BuildingMetrics {
   return {
     height: MIN_HEIGHT + (MAX_HEIGHT - MIN_HEIGHT) * score,
     lit: 0.08 + 0.8 * Math.pow(fresh, 0.75),
-    fill: 0.72 + breadth * 0.1 + jitter * 0.05,
     breadth,
     seed,
   };
