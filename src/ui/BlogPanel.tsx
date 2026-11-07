@@ -85,7 +85,7 @@ export default function BlogPanel({ building, onClose, onRandom }: BlogPanelProp
           <div className="meter" title="在这份列表里的更新排序：越新越亮">
             <span style={{ width: `${Math.max(4, freshPct)}%` }} />
           </div>
-          <p className="panel-note">活跃度 = 名单 README 的更新排序（RSS 每日检测），这里不额外抓取</p>
+          <p className="panel-note">活跃度 = 1 / (1 + 距上次发文天数 / 90)，数据来自列表的公开状态接口</p>
         </>
       )}
 
