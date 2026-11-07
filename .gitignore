@@ -4,3 +4,4 @@ dist/
 .tmp/
 .dev.vars
 .DS_Store
+AGENTS.md

@@ -1,9 +1,15 @@
 # 博客之城 · Blog City
 
+**[play.mukunjin.com](https://play.mukunjin.com)**
+
 把[中文独立博客列表](https://github.com/timqian/chinese-independent-blogs)变成一座 3D 像素城市：
 **每个博客是一栋楼**，越活跃楼越高、灯越亮，久未更新的缩在城郊。
 
-站点只吃静态资源，直接跑在 **Cloudflare Workers（静态资源）** 上，没有数据库、没有服务端。
+![夜空下的城市：1581 座大厦，越新的博客灯越亮](docs/1.png)
+
+![点开一栋楼：楼高、活跃度、名次和标签，以及打开博客的入口](docs/2.png)
+
+站点是纯静态的，托管在 **Cloudflare Pages**，没有数据库、没有服务端。
 
 ---
 
@@ -16,29 +22,30 @@ npm run dev          # http://localhost:3210
 
 ## 数据从哪来
 
-城市不读数据库，也没有任何实时抓取。所有信息都来自那个仓库的两个文件：
+三个来源，全部在**构建时**合并，浏览器里不做任何请求：
 
-| 文件 | 提供什么 |
-| --- | --- |
-| `blogs-original.csv` | 名单本体：名称、网址、RSS、标签 |
-| `README.md` | 活跃度：表格按最近发文时间排序；「疑似失效」小节给出失败原因 |
+| 来源 | 提供什么 | 取法 |
+| --- | --- | --- |
+| `blogs-original.csv` | 名单本体：名称、网址、RSS、标签 | jsDelivr 镜像（raw.githubusercontent 在国内常被墙） |
+| `indi.blog/api/blogs.json` | 每篇博客最近发文时间、是否失效、失败原因 | `npm run health` |
+| `README.md` | 兜底：没有状态快照时按表格名次算活跃度 | 同 CSV |
 
-`npm run data` 把两者读成 `src/data/blogs.json`（博客数量随上游名单变化，不在代码里写死）：
+`src/data/blogs.json` 是三者合并的结果（博客数量随上游名单变化，不在代码里写死）：
 
 ```bash
-npm run data              # 读同级目录的 chinese-independent-blogs 克隆（含它的 README）
-npm run sync              # 直接从 GitHub 拉最新的 blogs-original.csv + README.md
+npm run health     # 拉一次状态接口 → data/health.json（1 个请求，约 1 秒）
+npm run data       # 用本地 clone 的 CSV/README 重建城市快照
+npm run refresh    # 上面两步的合并版：拉接口 + 拉最新 CSV/README + 重建
 ```
 
-数据是**构建时打进包里**的：同步完要重新 `npm run build` 才会有新城市。
+数据是**构建时打进包里**的，所以同步完要重新 `npm run build` 才会有新城市。
+线上由 Cloudflare Pages 在每次 push 时构建。
 
-抓取的节奏（已核对上游仓库）：
+上游的检测节奏（已核对它的仓库）：
 
-- **每小时**：`frontend/worker` 的 cron（`wrangler.jsonc` 里 `7 * * * *`）检测到期的 RSS，写进 D1；
-- **每天**：GitHub Actions（`.github/workflows/updateInfo.yml`，`cron: 0 0 * * *`）跑 `scripts/render-readme.mjs`，
-  把检测结果重新渲染进 README 并提交。
-
-所以「README 的顺序 = 最近发文时间」这件事是上游保证的，城市只是消费它。
+- **每小时**：`frontend/worker` 的 cron（`7 * * * *`）检测到期的 RSS，写进 D1；
+- **每天**：GitHub Actions（`updateInfo.yml`）把结果渲染进 README 并提交；
+- 我们每**周四**拉一次它的状态接口，有变化才提交（`.github/workflows/sync-health.yml`）。
 
 ## 计算公式
 
