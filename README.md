@@ -1,13 +1,19 @@
-# 博客之城 · Blog City
+<p align="center">
+  <img src="docs/logo.svg" width="96" height="96" alt="Blog City 标志：夜里亮着灯的一栋像素大厦" />
+</p>
 
-**[play.mukunjin.com](https://play.mukunjin.com)**
+<h1 align="center">博客之城 · Blog City</h1>
+
+<p align="center">
+  <b><a href="https://play.mukunjin.com">play.mukunjin.com</a></b>
+</p>
 
 把[中文独立博客列表](https://github.com/timqian/chinese-independent-blogs)变成一座 3D 像素城市：
 **每个博客是一栋楼**，越活跃楼越高、灯越亮，久未更新的缩在城郊。
 
 ![夜空下的城市：1581 座大厦，越新的博客灯越亮](docs/1.png)
 
-![点开一栋楼：楼高、活跃度、名次和标签，以及打开博客的入口](docs/2.png)
+![点开一栋楼：楼高、活跃度、最近发文时间和标签，以及打开博客的入口](docs/2.png)
 
 站点是纯静态的，托管在 **Cloudflare Pages**，没有数据库、没有服务端。
 

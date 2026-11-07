@@ -82,7 +82,7 @@ export default function BlogPanel({ building, onClose, onRandom }: BlogPanelProp
 
       {!blog.dead && (
         <>
-          <div className="meter" title="在这份列表里的更新排序：越新越亮">
+          <div className="meter" title="距上次发文越近，灯越亮">
             <span style={{ width: `${Math.max(4, freshPct)}%` }} />
           </div>
           <p className="panel-note">活跃度 = 1 / (1 + 距上次发文天数 / 90)，数据来自列表的公开状态接口</p>
