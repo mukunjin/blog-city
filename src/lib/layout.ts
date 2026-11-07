@@ -9,7 +9,7 @@ import type { CityBuilding, CityLayout, CityRoad, CityTree } from "./types";
 // from the centre outwards, and blogs are taken freshest-first, so the newest
 // writing always ends up downtown and the quiet ones drift to the edge.
 
-const GAP = 8.5; // minimum air between two towers
+const GAP = 11.5; // minimum air between two towers
 const MAX_ATTEMPTS = 96;
 const HASH = 18;
 
@@ -21,7 +21,7 @@ const RING_FRACS = [0.34, 0.62, 0.88];
 const ROAD_PAD = 4.2;
 const SPOKE_OFFSET = 0.14; // avenues are rotated slightly off the axes
 // downtown is kept clear: a roundabout with the city's sign in the middle
-export const PLAZA = 74;
+export const PLAZA = 96;
 
 interface Rect {
   x: number;
@@ -48,7 +48,7 @@ export function buildCity(blogs: Blog[]): CityLayout {
   // area budget → radius; the packing factor stays low on purpose, the city
   // should read as scattered towers with air between them
   const area = feet.reduce((sum, f) => sum + (f.w + GAP) * (f.d + GAP), 0);
-  const radius = Math.max(60, Math.sqrt(area / (Math.PI * 0.3)));
+  const radius = Math.max(60, Math.sqrt(area / (Math.PI * 0.255)));
 
   // ── road plan ──
   const rings = RING_FRACS.map((f) => radius * f);
@@ -116,7 +116,7 @@ export function buildCity(blogs: Blog[]): CityLayout {
       // a building may not sit on a road, and needs the pad around it
       if (onRoad(candidate.x, candidate.z, ROAD_PAD + Math.max(candidate.w, candidate.d) * 0.5)) continue;
       // the roundabout owns the middle of town
-      if (Math.hypot(candidate.x, candidate.z) < PLAZA + 12 + Math.max(candidate.w, candidate.d) * 0.5) continue;
+      if (Math.hypot(candidate.x, candidate.z) < PLAZA + 26 + Math.max(candidate.w, candidate.d) * 0.5) continue;
       if (hits(candidate)) continue;
       placed = candidate;
       break;
@@ -226,7 +226,7 @@ function plantTrees(
       }
     }
     // on the asphalt? the trunk has to stand on the verge, not in the lane
-    if (Math.hypot(x, z) < PLAZA + 12) return false;
+    if (Math.hypot(x, z) < PLAZA + 30) return false;
     return !onRoad(x, z, 1.0);
   };
 
@@ -257,7 +257,7 @@ function plantTrees(
     const a = spokeBase + (s * Math.PI * 2) / SPOKES;
     const dx = Math.cos(a);
     const dz = Math.sin(a);
-    for (let t = PLAZA + 10; t < reach - 10; t += 19) {
+    for (let t = PLAZA + 34; t < reach - 10; t += 19) {
       for (const sign of [-1, 1]) {
         const jitterA = (rand01(Math.round(t * 13 + s * 97 + sign * 7)) - 0.5) * 2.4;
         const x = dx * t - dz * (sideOff + jitterA) * sign;

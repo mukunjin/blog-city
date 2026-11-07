@@ -1,5 +1,4 @@
 import { useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { CityLayout } from "../lib/types";
 
@@ -125,96 +124,111 @@ export function Roundabout({ layout }: { layout: CityLayout }) {
 }
 
 // ─── Traffic ───────────────────────────────────────────────────
+// Parked traffic: body, cabin, lights and wheels are just boxes, but the
+// whole fleet is baked into one InstancedMesh once — no per-frame work at all.
 
 interface Car {
-  spoke: number;
-  t: number;
-  speed: number;
+  x: number;
+  z: number;
+  angle: number;
   dir: number;
-  lane: number;
   len: number;
-  kind: number;
+  color: string;
 }
 
-const CAR_COLORS = ["#e8edf7", "#ffb057", "#7aa6ff", "#c9d3e6", "#ff7a6b"];
+const CAR_COLORS = ["#dfe7f5", "#ffb057", "#6f9cff", "#c3cfe2", "#ff7a6b", "#8fd6b4"];
+const GLASS = "#151d2c";
+const TIRE = "#0b1018";
+const HEAD = "#ffe6ad";
+const TAIL = "#ff5c4a";
 
 export function Traffic({ layout }: { layout: CityLayout }) {
   const spokes = useMemo(() => layout.roads.filter((r) => r.kind === "spoke"), [layout.roads]);
-  const meshRef = useRef<THREE.InstancedMesh>(null);
 
   const cars = useMemo<Car[]>(() => {
     const list: Car[] = [];
-    const per = 13;
-    const span = spokes[0] ? spokes[0].to - layout.plaza : 600;
-    spokes.forEach((_, si) => {
+    const per = 22;
+    const span = spokes[0] ? spokes[0].to - layout.plaza - 20 : 600;
+    spokes.forEach((spoke, si) => {
       for (let i = 0; i < per; i++) {
         const seed = si * 977 + i * 131;
         const r1 = ((seed * 9301 + 49297) % 233280) / 233280;
         const r2 = ((seed * 4801 + 9973) % 233281) / 233281;
+        const dir = i % 2 === 0 ? 1 : -1;
+        // random spacing, so the traffic clumps like real traffic instead of
+        // sitting on a grid
+        const t = layout.plaza + 16 + Math.pow(r1, 0.85) * span;
+        // two lanes, one each way, measured from the centreline
+        const lane = dir > 0 ? 3.1 : -3.1;
+        const cos = Math.cos(spoke.at);
+        const sin = Math.sin(spoke.at);
         list.push({
-          spoke: si,
-          t: layout.plaza + 6 + r1 * span,
-          speed: 16 + r2 * 22,
-          dir: i % 2 === 0 ? 1 : -1,
-          lane: (i % 4 < 2 ? 1 : -1) * (2.6 + (i % 2) * 1.6),
-          len: 3.2 + r1 * 1.6,
-          kind: Math.floor(r2 * CAR_COLORS.length) % CAR_COLORS.length,
+          x: cos * t - sin * lane,
+          z: sin * t + cos * lane,
+          angle: spoke.at,
+          dir,
+          len: 3.4 + r2 * 1.8,
+          color: CAR_COLORS[Math.floor(r2 * CAR_COLORS.length) % CAR_COLORS.length],
         });
       }
     });
     return list;
   }, [spokes, layout.plaza]);
 
-  const geo = useMemo(() => new THREE.BoxGeometry(1, 1, 1), []);
-  const mat = useMemo(() => new THREE.MeshBasicMaterial({ color: "#ffffff" }), []);
+  const mesh = useMemo(() => {
+    const PARTS = 8; // body, cabin, 2 lights, 4 wheels
+    const geo = new THREE.BoxGeometry(1, 1, 1);
+    const mat = new THREE.MeshBasicMaterial({ color: "#ffffff" });
+    const inst = new THREE.InstancedMesh(geo, mat, Math.max(1, cars.length * PARTS));
 
-  const tmp = useMemo(
-    () => ({
-      m: new THREE.Matrix4(),
-      p: new THREE.Vector3(),
-      q: new THREE.Quaternion(),
-      s: new THREE.Vector3(),
-      up: new THREE.Vector3(0, 1, 0),
-      c: new THREE.Color(),
-    }),
-    [],
-  );
+    const m = new THREE.Matrix4();
+    const p = new THREE.Vector3();
+    const q = new THREE.Quaternion();
+    const sc = new THREE.Vector3();
+    const c = new THREE.Color();
+    const up = new THREE.Vector3(0, 1, 0);
+    const fwd = new THREE.Vector3();
 
-  // colours never change, so they are written once
-  const painted = useRef(false);
+    let i = 0;
+    for (const car of cars) {
+      q.setFromAxisAngle(up, car.dir > 0 ? -car.angle : -car.angle + Math.PI);
+      fwd.set(car.dir > 0 ? Math.cos(car.angle) : -Math.cos(car.angle), 0, car.dir > 0 ? Math.sin(car.angle) : -Math.sin(car.angle));
+      const L = car.len;
 
-  useFrame((_, delta) => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    const dt = Math.min(delta, 0.1);
-    const end = spokes[0] ? spokes[0].to : 800;
+      const part = (offset: number, y: number, sx: number, sy: number, sz: number, color: string) => {
+        p.set(car.x + fwd.x * offset, y, car.z + fwd.z * offset);
+        sc.set(sx, sy, sz);
+        m.compose(p, q, sc);
+        inst.setMatrixAt(i, m);
+        inst.setColorAt(i, c.set(color));
+        i++;
+      };
 
-    if (!painted.current) {
-      cars.forEach((car, i) => mesh.setColorAt(i, tmp.c.set(CAR_COLORS[car.kind])));
-      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-      painted.current = true;
+      part(0, 0.62, L, 0.72, 1.92, car.color); // body
+      part(-L * 0.08, 1.24, L * 0.46, 0.62, 1.64, GLASS); // cabin, set back a little
+      part(L * 0.5, 0.64, 0.28, 0.26, 1.5, HEAD); // headlights
+      part(-L * 0.5, 0.62, 0.22, 0.22, 1.46, TAIL); // tail lights
+      // wheels
+      const wx = L * 0.3;
+      const wz = 0.86;
+      for (const sx of [wx, -wx]) {
+        for (const sz of [wz, -wz]) {
+          p.set(car.x + fwd.x * sx + fwd.z * sz, 0.32, car.z + fwd.z * sx - fwd.x * sz);
+          sc.set(L * 0.2, 0.44, 0.26);
+          m.compose(p, q, sc);
+          inst.setMatrixAt(i, m);
+          inst.setColorAt(i, c.set(TIRE));
+          i++;
+        }
+      }
     }
 
-    cars.forEach((car, i) => {
-      car.t += car.speed * dt * car.dir;
-      // loop back to the other end of the avenue
-      if (car.t > end) car.t = layout.plaza + 4;
-      if (car.t < layout.plaza + 2) car.t = end - 2;
+    inst.count = i;
+    inst.instanceMatrix.needsUpdate = true;
+    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+    inst.frustumCulled = false;
+    return inst;
+  }, [cars]);
 
-      const angle = spokes[car.spoke].at;
-      const cos = Math.cos(angle);
-      const sin = Math.sin(angle);
-      // lane offset is perpendicular to the avenue
-      tmp.p.set(cos * car.t - sin * car.lane, 0.75, sin * car.t + cos * car.lane);
-      tmp.q.setFromAxisAngle(tmp.up, car.dir > 0 ? -angle : -angle + Math.PI);
-      tmp.s.set(car.len, 1.1, 1.7);
-      tmp.m.compose(tmp.p, tmp.q, tmp.s);
-      mesh.setMatrixAt(i, tmp.m);
-    });
-    mesh.instanceMatrix.needsUpdate = true;
-  });
-
-  return (
-    <instancedMesh ref={meshRef} args={[geo, mat, cars.length]} frustumCulled={false} />
-  );
+  return <primitive object={mesh} />;
 }
