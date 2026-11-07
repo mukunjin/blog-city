@@ -22,6 +22,14 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      # Freshness is baked into blogs.json at build time, so a change to the
+      # metric (shared/blogs.mjs) would otherwise deploy unchanged data. Rebuild
+      # it here from the committed snapshot; if the mirrors are unreachable,
+      # fall back to the snapshot that is already in the repo.
+      - name: Rebuild the city data
+        run: node scripts/build-blogs.mjs --remote || echo "::warning::upstream unreachable, using the committed snapshot"
+
       - run: npm run build
 
       # Skips quietly until the two repository secrets exist, so the workflow
