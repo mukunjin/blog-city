@@ -175,7 +175,6 @@ export function Trees({ layout }: { layout: CityLayout }) {
 
   return (
     <group>
-      <hemisphereLight args={["#3d5c8c", "#0a0f18", 2.1]} />
       <primitive object={trunks} />
       <primitive object={broadCrowns} />
       <primitive object={pineCrowns} />

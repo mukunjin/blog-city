@@ -41,75 +41,112 @@ function homeFor(layout: CityLayout): Home {
   };
 }
 
-// A critically damped follow, frame-rate independent: motion starts from the
-// live camera value and can be re-targeted (or grabbed) at any instant.
-// zoom limits: close enough to read a single tower, far enough for the skyline
-const ZOOM_MIN = 20;
-const ZOOM_MAX_FACTOR = 1.45;
+// Camera. Same model as git-city: a map-style OrbitControls whose pivot is
+// wherever you last panned to, and a fixed-rate eased tween (not a spring) for
+// flying to a tower. Panning, orbiting and zooming all write that pivot, so the
+// view is never locked to the middle of the city.
+const TWEEN_RATE = 0.7; // builds the same 1.4s flight as the reference
+const ZOOM_MAX_FACTOR = 1.45; // how far out you may pull from the default view
+const MAX_TILT = Math.PI / 2.1;
+const AUTO_ROTATE_SPEED = 0.15;
 
-const RESPONSE = 0.24;
-const damp = (dt: number) => 1 - Math.exp(-dt / RESPONSE);
+interface Flight {
+  active: boolean;
+  t: number;
+  fromPos: THREE.Vector3;
+  fromLook: THREE.Vector3;
+  toPos: THREE.Vector3;
+  toLook: THREE.Vector3;
+}
 
 function Rig({ focus, homeToken, home }: { focus: FocusTarget | null; homeToken: number; home: Home }) {
   const controls = useRef<OrbitControlsImpl | null>(null);
   const { camera } = useThree();
-  const goal = useRef<{ pos: THREE.Vector3; target: THREE.Vector3 } | null>(null);
   const reduce = useReducedMotion();
+  const flight = useRef<Flight>({
+    active: false,
+    t: 1,
+    fromPos: new THREE.Vector3(),
+    fromLook: new THREE.Vector3(),
+    toPos: new THREE.Vector3(),
+    toLook: new THREE.Vector3(),
+  });
+  // the city stops turning on its own the moment the visitor takes the camera
+  const userMoved = useRef(false);
 
-  useEffect(() => {
-    camera.position.copy(home.pos);
-  }, [camera]);
-
-  useEffect(() => {
-    if (!focus) return;
+  const fly = (toPos: THREE.Vector3, toLook: THREE.Vector3) => {
     const ctl = controls.current;
     if (!ctl) return;
+    const f = flight.current;
+    f.fromPos.copy(camera.position);
+    f.fromLook.copy(ctl.target);
+    f.toPos.copy(toPos);
+    f.toLook.copy(toLook);
+    f.t = 0;
+    f.active = true;
+    ctl.autoRotate = false;
+  };
 
-    const target = new THREE.Vector3(focus.x, Math.min(focus.h * 0.45, 92), focus.z);
-    const dir = new THREE.Vector3().subVectors(camera.position, ctl.target);
-    if (dir.lengthSq() < 1) dir.set(0.72, 0.5, 0.62);
-    dir.y = Math.max(dir.y, dir.length() * 0.34);
-    dir.normalize();
-    // framed with air around the tower: still a close-up, but the roof, the base
-    // and a slice of the street all stay in shot
-    const distance = Math.max(38, focus.h * 1.75 + 30);
-    const pos = target.clone().addScaledVector(dir, distance);
+  const snap = (toPos: THREE.Vector3, toLook: THREE.Vector3) => {
+    const ctl = controls.current;
+    if (!ctl) return;
+    camera.position.copy(toPos);
+    ctl.target.copy(toLook);
+    ctl.update();
+  };
 
-    if (reduce) {
-      camera.position.copy(pos);
-      ctl.target.copy(target);
-      ctl.update();
-      return;
-    }
-    goal.current = { pos, target };
+  // ← a tower
+  useEffect(() => {
+    const ctl = controls.current;
+    if (!focus || !ctl) return;
+
+    // Stand outside the tower, on the side facing away from downtown, and look
+    // back at its face. Distance follows the tower's height, since ours range
+    // from a 9-unit dead blog to a 214-unit landmark.
+    const k = Math.min(1.9, Math.max(0.62, focus.h / 110));
+    const isMobile = window.innerWidth < 640;
+    const dist = (isMobile ? 300 : 180) * k;
+    const camH = (isMobile ? 200 : 120) * k;
+
+    const len = Math.hypot(focus.x, focus.z);
+    const nx = len > 1 ? focus.x / len : 0.707;
+    const nz = len > 1 ? focus.z / len : 0.707;
+
+    const toPos = new THREE.Vector3(focus.x + nx * dist, focus.h + camH, focus.z + nz * dist);
+    const toLook = new THREE.Vector3(focus.x, Math.max(0, focus.h + 15), focus.z);
+
+    if (reduce) snap(toPos, toLook);
+    else fly(toPos, toLook);
   }, [focus, camera, reduce]);
 
-  // leaving a tower: keep the view, but hand the rotation centre back to town
+  // ← leaving a tower: hand the pivot back to the middle of town, view unchanged
   useEffect(() => {
     if (!homeToken) return;
     const ctl = controls.current;
     if (!ctl) return;
-    if (reduce) {
-      ctl.target.copy(home.target);
-      ctl.update();
-      return;
-    }
-    goal.current = { pos: camera.position.clone(), target: home.target.clone() };
-  }, [homeToken, camera, reduce]);
+    if (reduce) snap(camera.position.clone(), home.target);
+    else fly(camera.position.clone(), home.target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [homeToken]);
 
-  useFrame((_state, delta) => {
+  useFrame((_, delta) => {
     const ctl = controls.current;
     if (!ctl) return;
-
-    const g = goal.current;
-    if (g) {
-      const k = damp(Math.min(delta, 0.1));
-      camera.position.lerp(g.pos, k);
-      ctl.target.lerp(g.target, k);
-      // settle once it is visually there, so damping never fights the visitor
-      if (camera.position.distanceTo(g.pos) < 0.6) goal.current = null;
+    const f = flight.current;
+    if (f.active) {
+      f.t = Math.min(1, f.t + delta * TWEEN_RATE);
+      // ease-out cubic, exactly the reference curve
+      const e = 1 - Math.pow(1 - f.t, 3);
+      camera.position.lerpVectors(f.fromPos, f.toPos, e);
+      ctl.target.lerpVectors(f.fromLook, f.toLook, e);
+      ctl.update();
+      if (f.t >= 1) {
+        f.active = false;
+        if (!userMoved.current && !focus) ctl.autoRotate = true;
+      }
+      return;
     }
-    ctl.update();
+    // OrbitControls keeps itself up to date (damping + auto-rotate)
   });
 
   return (
@@ -117,17 +154,28 @@ function Rig({ focus, homeToken, home }: { focus: FocusTarget | null; homeToken:
       ref={controls}
       makeDefault
       enableDamping
-      dampingFactor={0.075}
-      rotateSpeed={0.55}
-      zoomSpeed={0.7}
-      panSpeed={0.6}
-      minDistance={ZOOM_MIN}
+      dampingFactor={0.08}
+      minDistance={32}
       maxDistance={home.distance * ZOOM_MAX_FACTOR}
-      maxPolarAngle={Math.PI / 2 - 0.045}
+      maxPolarAngle={MAX_TILT}
       target={home.target}
-      // grabbing the city mid-flight takes over instantly
+      autoRotate
+      autoRotateSpeed={AUTO_ROTATE_SPEED}
+      mouseButtons={{
+        LEFT: THREE.MOUSE.PAN,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: THREE.MOUSE.ROTATE,
+      }}
+      touches={{ ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE }}
+      screenSpacePanning={false}
+      zoomToCursor
+      keyEvents
+      keyPanSpeed={40}
       onStart={() => {
-        goal.current = null;
+        // grabbing the city mid-flight takes over instantly
+        userMoved.current = true;
+        flight.current.active = false;
+        if (controls.current) controls.current.autoRotate = false;
       }}
     />
   );
@@ -255,6 +303,9 @@ export default function CityScene({
       <Stars />
       <Moon />
       <ambientLight intensity={0.5} />
+      {/* the only light in the scene: it shades the trees and the monument,
+          everything else is unlit shaders */}
+      <hemisphereLight args={["#3d5c8c", "#0a0f18", 2.1]} />
       <Ground layout={layout} fog={fog} />
       <Roads layout={layout} />
       <Roundabout layout={layout} />

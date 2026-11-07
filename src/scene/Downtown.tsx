@@ -1,84 +1,41 @@
-import { useMemo, useRef } from "react";
+import { useMemo } from "react";
 import * as THREE from "three";
+import { FontLoader, type FontData } from "three/examples/jsm/loaders/FontLoader.js";
+import { TextGeometry } from "three/examples/jsm/geometries/TextGeometry.js";
+import fontJson from "three/examples/fonts/helvetiker_bold.typeface.json";
 import type { CityLayout } from "../lib/types";
 
 // ─── Downtown ──────────────────────────────────────────────────
-// A roundabout in the middle of town, with a signpost standing on it: four
-// boards around a column, each carrying the city's name. The lettering is
-// painted into a canvas once and used as a texture — real type, no font file,
-// one draw call for the whole sign.
+// A roundabout in the middle of town. The monument is nothing but the eight
+// letters of the city's name, extruded from a real typeface and standing on the
+// island — one face, one draw call, no boards to read around.
 
 const ASPHALT = "#171d29";
 const ISLAND = "#0d1512";
 const STONE = "#141a24";
 const SIGN = "#ffcf7a";
-
-const BOARD_W = 44;
-const BOARD_H = 18;
-const BOARD_Y = 23; // board block starts on top of the column
-
-function signTexture(): THREE.CanvasTexture {
-  const w = 1024;
-  const h = Math.round((w * BOARD_H) / BOARD_W);
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d")!;
-
-  // board
-  ctx.fillStyle = "#0a1018";
-  ctx.fillRect(0, 0, w, h);
-  ctx.strokeStyle = "rgba(255, 207, 122, 0.55)";
-  ctx.lineWidth = 6;
-  ctx.strokeRect(5, 5, w - 10, h - 10);
-
-  // lettering, with a soft glow so it reads as lit rather than printed
-  ctx.fillStyle = SIGN;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  const size = Math.round(h * 0.52);
-  ctx.font = `700 ${size}px "Helvetica Neue", Helvetica, Arial, sans-serif`;
-  if ("letterSpacing" in ctx) (ctx as unknown as { letterSpacing: string }).letterSpacing = "8px";
-  ctx.shadowColor = "rgba(255, 190, 90, 0.85)";
-  ctx.shadowBlur = size * 0.35;
-  ctx.fillText("BLOG CITY", w / 2, h * 0.53);
-  ctx.shadowBlur = 0;
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
-}
+const LETTER = 21;
+const FACING = Math.atan2(0.56, 0.8); // turn the word towards the opening view
 
 export function Roundabout({ layout }: { layout: CityLayout }) {
   const plaza = layout.plaza;
 
-  const sign = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(BOARD_W, BOARD_H);
-    const mat = new THREE.MeshBasicMaterial({ map: signTexture() });
-    // the four faces of a hollow box: at any angle you see at least one head-on
-    const half = BOARD_W / 2;
-    const faces: [number, number, number][] = [
-      [0, 0, half],
-      [Math.PI, 0, -half],
-      [Math.PI / 2, half, 0],
-      [-Math.PI / 2, -half, 0],
-    ];
-    const mesh = new THREE.InstancedMesh(geo, mat, faces.length);
-    const m = new THREE.Matrix4();
-    const p = new THREE.Vector3();
-    const q = new THREE.Quaternion();
-    const sc = new THREE.Vector3(1, 1, 1);
-    const up = new THREE.Vector3(0, 1, 0);
-    faces.forEach(([rotY, x, z], i) => {
-      q.setFromAxisAngle(up, rotY);
-      p.set(x, BOARD_Y, z);
-      m.compose(p, q, sc);
-      mesh.setMatrixAt(i, m);
+  const monument = useMemo(() => {
+    const font = new FontLoader().parse(fontJson as unknown as FontData);
+    const geo = new TextGeometry("BLOG CITY", {
+      font,
+      size: LETTER,
+      depth: 3.4,
+      curveSegments: 3,
+      bevelEnabled: false,
     });
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.frustumCulled = false;
-    return mesh;
+    geo.computeBoundingBox();
+    const bb = geo.boundingBox!;
+    const width = bb.max.x - bb.min.x;
+    // centre the word on its own axis, and its depth on z = 0
+    geo.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2);
+    const mat = new THREE.MeshLambertMaterial({ color: SIGN, emissive: "#4a3410" });
+    return { mesh: new THREE.Mesh(geo, mat), width };
   }, []);
 
   return (
@@ -95,23 +52,19 @@ export function Roundabout({ layout }: { layout: CityLayout }) {
         <meshBasicMaterial color={ISLAND} />
       </mesh>
 
-      {/* plinth + column, with the sign sitting on top */}
-      <mesh position={[0, 0.9, 0]}>
-        <cylinderGeometry args={[plaza * 0.24, plaza * 0.26, 1.8, 28]} />
-        <meshBasicMaterial color={STONE} />
-      </mesh>
-      <mesh position={[0, 7.9, 0]}>
-        <boxGeometry args={[6.8, 12.2, 6.8]} />
+      {/* plinth, and the word standing on it */}
+      <mesh position={[0, 0.8, 0]}>
+        <cylinderGeometry args={[plaza * 0.36, plaza * 0.38, 1.6, 32]} />
         <meshBasicMaterial color={STONE} />
       </mesh>
 
-      {/* the cap keeps the hollow box from reading as a tube from above */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, BOARD_Y + BOARD_H / 2, 0]}>
-        <planeGeometry args={[BOARD_W, BOARD_W]} />
-        <meshBasicMaterial color="#0a1018" />
-      </mesh>
-
-      <primitive object={sign} />
+      <group rotation={[0, FACING, 0]}>
+        <mesh position={[0, 2.15, 0]}>
+          <boxGeometry args={[monument.width + 12, 0.9, 7]} />
+          <meshBasicMaterial color={STONE} />
+        </mesh>
+        <primitive object={monument.mesh} position={[0, 2.6, 0]} />
+      </group>
     </group>
   );
 }
