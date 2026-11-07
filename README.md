@@ -180,7 +180,7 @@ Build output:      dist
 - 构建命令收在 `package.json` 的 `build:ci` 里（`(重建数据 || true) && vite build`），面板里只有一句，改逻辑改仓库即可，不会出现「面板和仓库不一致」；
 - Node 版本由仓库里的 `.node-version` 文件指定（`22`），Pages 的构建镜像会读它。
 
-保存后得到 `https://blog-city.pages.dev`。
+保存后得到 `https://blog-city.pages.dev`；绑上自定义域名后正式地址是 **https://play.mukunjin.com**。
 
 ### 之后
 
@@ -191,7 +191,7 @@ git push          # 只有这一句
 Pages 监听 push → 构建 → 上线，构建失败会发邮件。分支推送会生成独立预览：
 
 ```
-main   → https://blog-city.pages.dev              （生产）
+main   → https://play.mukunjin.com                 （生产）
 分支 X → https://x.blog-city.pages.dev            （预览，不影响生产）
 ```
 
@@ -209,7 +209,7 @@ main   → https://blog-city.pages.dev              （生产）
 
 想改成每天或每小时，改那行 `cron`（构建次数上限 500 次/月，现在用不到 5%）。
 
-### 两个可选的加固
+### 可选的加固
 
 **① Deploy Hook（防 webhook 丢投递）**
 
@@ -220,16 +220,6 @@ Pages 项目 → Settings → Builds & deployments → Deploy hooks → Add，�
 ```
 
 `sync-health.yml` 里已经有这一步：提交之后，如果这个 secret 存在就额外 POST 一次触发构建；不存在就跳过。不配也能用，页面更新依赖 webhook。
-
-**② 线上巡检**
-
-`.github/workflows/site-check.yml` 每天 11:37（北京时间）访问一次线上地址，检查：
-
-- HTTP 200
-- 页面里含「博客之城」
-- 页面引用的 `/assets/*.js` 真的能下载
-
-站点挂了会以 workflow 失败的形式通知你 —— 因为 Pages 的构建发生在 Cloudflare，GitHub 这边本来完全看不到。
 
 ### 手动部署（一般用不上）
 
