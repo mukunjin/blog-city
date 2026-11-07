@@ -14,7 +14,7 @@ const ASPHALT = "#171d29";
 const ISLAND = "#0d1512";
 const STONE = "#141a24";
 const SIGN = "#ffcf7a";
-const LETTER = 21;
+const LETTER = 17; // 8 letters at 17 tall come out ~125 wide, inside the island
 const FACING = Math.atan2(0.56, 0.8); // turn the word towards the opening view
 
 export function Roundabout({ layout }: { layout: CityLayout }) {
@@ -60,7 +60,7 @@ export function Roundabout({ layout }: { layout: CityLayout }) {
 
       <group rotation={[0, FACING, 0]}>
         <mesh position={[0, 2.15, 0]}>
-          <boxGeometry args={[monument.width + 12, 0.9, 7]} />
+          <boxGeometry args={[monument.width + 9, 0.9, 7]} />
           <meshBasicMaterial color={STONE} />
         </mesh>
         <primitive object={monument.mesh} position={[0, 2.6, 0]} />
