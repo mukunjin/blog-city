@@ -4,7 +4,9 @@ name: deploy
 # publishes. Data is baked into the build, so nothing is fetched at runtime.
 on:
   push:
-    branches: [master]
+    # this repo was initialised on `main`; both names so a rename never
+    # silently disables deploys
+    branches: [main, master]
   workflow_dispatch:
 
 jobs:
