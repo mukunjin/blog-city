@@ -9,8 +9,7 @@
     "dev": "vite --port 3210",
     "build": "vite build",
     "preview": "vite preview --port 3210",
-    "deploy": "npm run build && wrangler deploy",
-    "deploy:dry": "npm run build && wrangler deploy --dry-run --outdir .wrangler/dry",
+    "deploy": "npm run build && npx wrangler pages deploy dist --project-name blog-city --branch main",
     "health": "node scripts/sync-health.mjs",
     "refresh": "node scripts/sync-health.mjs && node scripts/build-blogs.mjs --remote",
     "sync": "node scripts/build-blogs.mjs --remote"

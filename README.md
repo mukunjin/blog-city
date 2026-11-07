@@ -161,29 +161,60 @@ OrbitControls 本身没有平移限制，这是补在它之后的一层。
 点大厦的飞行是一段 1.4 秒的缓出插值（`progress += delta × 0.7`，`1 - (1-p)³`），
 机位从「背离城中心」的一侧看向楼的正面 —— 这也是 git-city 的做法。
 
-## 部署到 Cloudflare Workers
+## 部署
+
+托管在 **Cloudflare Pages**，走 Git 集成：连一次仓库，之后每次 push 自动构建上线。
+
+### 第一次（只做一次）
+
+面板 → Workers & Pages → Create → **Pages** → **Connect to Git** → 选 `mukunjin/blog-city`，填：
+
+```
+Framework preset:  None
+Build command:     (node scripts/build-blogs.mjs --remote || true) && npm run build
+Build output:      dist
+环境变量:           NODE_VERSION = 22
+```
+
+那对括号别省：拉不到上游数据时用仓库里的快照继续构建，而不是整站构建失败。
+
+保存后会得到 `https://blog-city.pages.dev`。
+
+### 之后
 
 ```bash
-npx wrangler login    # 一次性
-npm run deploy        # = vite build && wrangler deploy
+git push          # 就这么简单
 ```
 
-首次部署会得到 `https://blog-city.<你的子域>.workers.dev`。
-绑自定义域名就往 `wrangler.jsonc` 里加一条 routes：
+Pages 监听 push，自己构建、自己上线，构建失败会发邮件。
 
-```jsonc
-"routes": [{ "pattern": "city.example.com", "custom_domain": true }]
+想绑自定义域名：Pages 项目 → Custom domains → 添加，按提示改 DNS 即可（域名也在 Cloudflare 的话是一键）。
+
+### 手动部署（一般用不上）
+
+```bash
+npm run deploy    # = build + wrangler pages deploy dist
 ```
 
-`npm run deploy:dry` 可以先本地 dry-run 打包，不上传。
-想从 CI 部署，在 GitHub Secrets 里放 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`，然后跑 `npx wrangler deploy`。
+需要 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID` 两个环境变量。
+
+### 数据怎么更新
+
+`.github/workflows/sync-health.yml` 每周四 10:17（北京时间）拉一次状态接口：
+
+```
+数据有变化 → commit & push → Pages 自动重建 → 上线
+数据没变化 → 什么都不做，不构建不部署
+```
+
+想改成每天或每小时，改那个 `cron` 一行即可（构建次数上限 500 次/月，现在用不到 5%）。
 
 ## 添加新博客
 
 1. 往 `chinese-independent-blogs/blogs-original.csv` 尾部加一行：`名称, 网址, RSS, 标签`
    （长期做法是给上游仓库提 PR，让所有人都有这栋楼）；
-2. `npm run data` 重新生成城市数据；
-3. `npm run deploy` 发布。
+2. `npm run refresh` 重新拉数据并生成城市快照；
+3. `git push` 发布。
 
 还没进 README 的新博客会按「最新收录」处理，先给一个偏高的活跃度；等上游把 README 同步之后，位置就按真实发文时间落定。
 
