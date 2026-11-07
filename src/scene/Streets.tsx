@@ -92,7 +92,7 @@ export function Trees({ layout }: { layout: CityLayout }) {
   }, [layout.trees]);
 
   const trunks = useMemo(() => {
-    const geo = new THREE.CylinderGeometry(0.34, 0.44, 1, 5);
+    const geo = new THREE.CylinderGeometry(0.34, 0.44, 1, 4, 1, true);
     geo.translate(0, 0.5, 0);
     const mat = new THREE.MeshLambertMaterial({ color: "#241d16" });
     const mesh = new THREE.InstancedMesh(geo, mat, Math.max(1, layout.trees.length));
@@ -144,7 +144,7 @@ export function Trees({ layout }: { layout: CityLayout }) {
   }, [groups.broad]);
 
   const pineCrowns = useMemo(() => {
-    const geo = new THREE.ConeGeometry(1, 1, 6);
+    const geo = new THREE.ConeGeometry(1, 1, 6, 1, true);
     geo.translate(0, 0.5, 0);
     const mat = new THREE.MeshLambertMaterial({});
     const mesh = new THREE.InstancedMesh(geo, mat, Math.max(1, groups.pine.length));

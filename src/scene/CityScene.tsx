@@ -43,7 +43,7 @@ function homeFor(layout: CityLayout): Home {
 // A critically damped follow, frame-rate independent: motion starts from the
 // live camera value and can be re-targeted (or grabbed) at any instant.
 // zoom limits: close enough to read a single tower, far enough for the skyline
-const ZOOM_MIN = 45;
+const ZOOM_MIN = 20;
 const ZOOM_MAX_FACTOR = 1.45;
 
 const RESPONSE = 0.24;
@@ -64,12 +64,15 @@ function Rig({ focus, homeToken, home }: { focus: FocusTarget | null; homeToken:
     const ctl = controls.current;
     if (!ctl) return;
 
-    const target = new THREE.Vector3(focus.x, Math.min(focus.h * 0.45, 80), focus.z);
+    const target = new THREE.Vector3(focus.x, Math.min(focus.h * 0.45, 92), focus.z);
     const dir = new THREE.Vector3().subVectors(camera.position, ctl.target);
     if (dir.lengthSq() < 1) dir.set(0.72, 0.5, 0.62);
-    dir.y = Math.max(dir.y, dir.length() * 0.32);
+    dir.y = Math.max(dir.y, dir.length() * 0.34);
     dir.normalize();
-    const distance = Math.max(58, focus.h * 1.9 + 46);
+    // 42deg vertical fov ≈ tan(21°) ≈ 0.384, so a tower of height h fills the
+    // frame from h·1.3 away — close enough to read the windows, far enough that
+    // the roof never gets cut off
+    const distance = Math.max(24, focus.h * 1.3);
     const pos = target.clone().addScaledVector(dir, distance);
 
     if (reduce) {

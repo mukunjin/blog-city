@@ -179,7 +179,7 @@ export function buildCity(blogs: Blog[]): CityLayout {
 // Two passes: a formal line of trees along every avenue and ring, then loose
 // clusters in the gaps. Both reject anything that would clip a tower.
 
-const TREE_MIN_DIST = 8.6;
+const TREE_MIN_DIST = 15.5;
 const TREE_HASH = 9;
 
 function plantTrees(
@@ -252,7 +252,7 @@ function plantTrees(
     const a = spokeBase + (s * Math.PI * 2) / SPOKES;
     const dx = Math.cos(a);
     const dz = Math.sin(a);
-    for (let t = 14; t < reach - 6; t += 9.5) {
+    for (let t = 18; t < reach - 10; t += 19) {
       for (const sign of [-1, 1]) {
         const jitterA = (rand01(Math.round(t * 13 + s * 97 + sign * 7)) - 0.5) * 2.4;
         const x = dx * t - dz * (sideOff + jitterA) * sign;
@@ -266,7 +266,7 @@ function plantTrees(
   for (const r of rings) {
     const rIn = r - (RING_WIDTH / 2 + 3.6);
     const rOut = r + (RING_WIDTH / 2 + 3.6);
-    const steps = Math.round((Math.PI * 2 * r) / 11);
+    const steps = Math.round((Math.PI * 2 * r) / 21);
     for (let i = 0; i < steps; i++) {
       const a = (i / steps) * Math.PI * 2 + 0.13;
       add(Math.cos(a) * rIn, Math.sin(a) * rIn);
@@ -275,7 +275,7 @@ function plantTrees(
   }
 
   // 3. loose clusters in the empty lots
-  const scatter = Math.round(radius * 2.6);
+  const scatter = Math.round(radius * 0.45);
   for (let i = 0; i < scatter; i++) {
     const a = rand01(i * 7919 + 3) * Math.PI * 2;
     const rr = Math.sqrt(rand01(i * 104729 + 11)) * radius * 1.02;
