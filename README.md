@@ -167,47 +167,77 @@ OrbitControls 本身没有平移限制，这是补在它之后的一层。
 
 ### 第一次（只做一次）
 
-面板 → Workers & Pages → Create → **Pages** → **Connect to Git** → 选 `mukunjin/blog-city`，填：
+面板 → Workers & Pages → Create → **Pages** → **Connect to Git** → 选 `mukunjin/blog-city`：
 
 ```
 Framework preset:  None
-Build command:     (node scripts/build-blogs.mjs --remote || true) && npm run build
+Build command:     npm run build:ci
 Build output:      dist
-环境变量:           NODE_VERSION = 22
 ```
 
-那对括号别省：拉不到上游数据时用仓库里的快照继续构建，而不是整站构建失败。
+就这两个字段要填。**不要**在面板里写长命令或配 `NODE_VERSION`：
 
-保存后会得到 `https://blog-city.pages.dev`。
+- 构建命令收在 `package.json` 的 `build:ci` 里（`(重建数据 || true) && vite build`），面板里只有一句，改逻辑改仓库即可，不会出现「面板和仓库不一致」；
+- Node 版本由仓库里的 `.node-version` 文件指定（`22`），Pages 的构建镜像会读它。
+
+保存后得到 `https://blog-city.pages.dev`。
 
 ### 之后
 
 ```bash
-git push          # 就这么简单
+git push          # 只有这一句
 ```
 
-Pages 监听 push，自己构建、自己上线，构建失败会发邮件。
+Pages 监听 push → 构建 → 上线，构建失败会发邮件。分支推送会生成独立预览：
 
-想绑自定义域名：Pages 项目 → Custom domains → 添加，按提示改 DNS 即可（域名也在 Cloudflare 的话是一键）。
+```
+main   → https://blog-city.pages.dev              （生产）
+分支 X → https://x.blog-city.pages.dev            （预览，不影响生产）
+```
+
+改版式时开个分支推上去看效果，满意再合。回滚：项目 → Deployments → 选任意一次历史部署 → **Rollback**。
+
+### 数据怎么更新
+
+`.github/workflows/sync-health.yml`，每周四 10:17（北京时间）：
+
+```
+拉一次状态接口
+ ├─ 快照没变 → 直接结束，不提交、不构建
+ └─ 快照变了 → commit & push → Pages 自动重建 → 上线
+```
+
+想改成每天或每小时，改那行 `cron`（构建次数上限 500 次/月，现在用不到 5%）。
+
+### 两个可选的加固
+
+**① Deploy Hook（防 webhook 丢投递）**
+
+Pages 项目 → Settings → Builds & deployments → Deploy hooks → Add，复制 URL，存到 GitHub 仓库 secret：
+
+```
+名称：CF_DEPLOY_HOOK
+```
+
+`sync-health.yml` 里已经有这一步：提交之后，如果这个 secret 存在就额外 POST 一次触发构建；不存在就跳过。不配也能用，页面更新依赖 webhook。
+
+**② 线上巡检**
+
+`.github/workflows/site-check.yml` 每天 11:37（北京时间）访问一次线上地址，检查：
+
+- HTTP 200
+- 页面里含「博客之城」
+- 页面引用的 `/assets/*.js` 真的能下载
+
+站点挂了会以 workflow 失败的形式通知你 —— 因为 Pages 的构建发生在 Cloudflare，GitHub 这边本来完全看不到。
 
 ### 手动部署（一般用不上）
 
 ```bash
-npm run deploy    # = build + wrangler pages deploy dist
+npm run deploy    # = build + wrangler pages deploy dist --project-name blog-city
 ```
 
-需要 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID` 两个环境变量。
-
-### 数据怎么更新
-
-`.github/workflows/sync-health.yml` 每周四 10:17（北京时间）拉一次状态接口：
-
-```
-数据有变化 → commit & push → Pages 自动重建 → 上线
-数据没变化 → 什么都不做，不构建不部署
-```
-
-想改成每天或每小时，改那个 `cron` 一行即可（构建次数上限 500 次/月，现在用不到 5%）。
+需要 `CLOUDFLARE_API_TOKEN` 和 `CLOUDFLARE_ACCOUNT_ID` 两个环境变量。日常不用它，Git 集成已经覆盖。
 
 ## 添加新博客
 
