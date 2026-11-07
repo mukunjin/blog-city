@@ -5,6 +5,7 @@ import * as THREE from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import Buildings from "./Buildings";
 import { Roads, Trees } from "./Streets";
+import { Roundabout, Traffic } from "./Downtown";
 import { Ground, Moon, PALETTE, Sky, Stars } from "./Backdrop";
 import type { CityBuilding, CityLayout } from "../lib/types";
 import { useReducedMotion } from "../lib/usePresence";
@@ -69,10 +70,9 @@ function Rig({ focus, homeToken, home }: { focus: FocusTarget | null; homeToken:
     if (dir.lengthSq() < 1) dir.set(0.72, 0.5, 0.62);
     dir.y = Math.max(dir.y, dir.length() * 0.34);
     dir.normalize();
-    // 42deg vertical fov ≈ tan(21°) ≈ 0.384, so a tower of height h fills the
-    // frame from h·1.3 away — close enough to read the windows, far enough that
-    // the roof never gets cut off
-    const distance = Math.max(24, focus.h * 1.3);
+    // framed with air around the tower: still a close-up, but the roof, the base
+    // and a slice of the street all stay in shot
+    const distance = Math.max(38, focus.h * 1.75 + 30);
     const pos = target.clone().addScaledVector(dir, distance);
 
     if (reduce) {
@@ -257,6 +257,8 @@ export default function CityScene({
       <ambientLight intensity={0.5} />
       <Ground layout={layout} fog={fog} />
       <Roads layout={layout} />
+      <Roundabout layout={layout} />
+      <Traffic layout={layout} />
       <Trees layout={layout} />
       <Buildings layout={layout} onHover={onHover} onSelect={onSelect} fog={fog} />
       <SelectionMarker building={selected} />

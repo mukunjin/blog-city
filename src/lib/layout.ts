@@ -20,6 +20,8 @@ const RING_FRACS = [0.34, 0.62, 0.88];
 // a tower keeps this much distance from the asphalt edge
 const ROAD_PAD = 4.2;
 const SPOKE_OFFSET = 0.14; // avenues are rotated slightly off the axes
+// downtown is kept clear: a roundabout with the city's sign in the middle
+export const PLAZA = 74;
 
 interface Rect {
   x: number;
@@ -113,6 +115,8 @@ export function buildCity(blogs: Blog[]): CityLayout {
       };
       // a building may not sit on a road, and needs the pad around it
       if (onRoad(candidate.x, candidate.z, ROAD_PAD + Math.max(candidate.w, candidate.d) * 0.5)) continue;
+      // the roundabout owns the middle of town
+      if (Math.hypot(candidate.x, candidate.z) < PLAZA + 12 + Math.max(candidate.w, candidate.d) * 0.5) continue;
       if (hits(candidate)) continue;
       placed = candidate;
       break;
@@ -152,7 +156,7 @@ export function buildCity(blogs: Blog[]): CityLayout {
       kind: "spoke",
       at: spokeBase + (s * Math.PI * 2) / SPOKES,
       width: SPOKE_WIDTH,
-      from: 0,
+      from: PLAZA - 4,
       to: reach,
     });
   }
@@ -172,7 +176,7 @@ export function buildCity(blogs: Blog[]): CityLayout {
     maxZ = Math.max(maxZ, b.z + b.d / 2);
   }
 
-  return { buildings, roads, trees, extent: { minX, maxX, minZ, maxZ } };
+  return { buildings, roads, trees, plaza: PLAZA, extent: { minX, maxX, minZ, maxZ } };
 }
 
 // ─── Trees ─────────────────────────────────────────────────────
@@ -222,6 +226,7 @@ function plantTrees(
       }
     }
     // on the asphalt? the trunk has to stand on the verge, not in the lane
+    if (Math.hypot(x, z) < PLAZA + 12) return false;
     return !onRoad(x, z, 1.0);
   };
 
@@ -252,7 +257,7 @@ function plantTrees(
     const a = spokeBase + (s * Math.PI * 2) / SPOKES;
     const dx = Math.cos(a);
     const dz = Math.sin(a);
-    for (let t = 18; t < reach - 10; t += 19) {
+    for (let t = PLAZA + 10; t < reach - 10; t += 19) {
       for (const sign of [-1, 1]) {
         const jitterA = (rand01(Math.round(t * 13 + s * 97 + sign * 7)) - 0.5) * 2.4;
         const x = dx * t - dz * (sideOff + jitterA) * sign;

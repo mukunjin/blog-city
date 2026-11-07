@@ -24,6 +24,8 @@ export interface CityLayout {
   buildings: CityBuilding[];
   roads: CityRoad[];
   trees: CityTree[];
+  /** radius of the downtown roundabout that keeps its middle clear */
+  plaza: number;
   extent: { minX: number; maxX: number; minZ: number; maxZ: number };
 }
 
