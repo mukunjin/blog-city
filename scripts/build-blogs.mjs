@@ -41,10 +41,25 @@ async function load() {
   }
 }
 
+// The status snapshot decides freshness and death by real dates. Without it the
+// README rank is used instead (the file is optional and may lag or be missing).
+async function loadHealth() {
+  try {
+    const raw = await readFile(path.join(root, 'data', 'health.json'), 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!parsed?.blogs || !Object.keys(parsed.blogs).length) return { health: undefined, count: 0 };
+    return { health: parsed.blogs, count: Object.keys(parsed.blogs).length };
+  } catch {
+    return { health: undefined, count: 0 };
+  }
+}
+
 const { csvText, readmeText, label } = await load();
+const { health, count: healthCount } = await loadHealth();
 const catalog = buildCatalog({
   csvText,
   readmeText,
+  health,
   generatedAt: new Date().toISOString(),
 });
 
@@ -55,5 +70,6 @@ await writeFile(out, JSON.stringify(catalog), 'utf8');
 const kb = (Buffer.byteLength(JSON.stringify(catalog)) / 1024).toFixed(0);
 console.log(`✓ ${catalog.blogs.length} blogs from ${label} → ${path.relative(root, out)} (${kb} kB)`);
 console.log(`  dead: ${catalog.stats.dead} · tagged: ${catalog.stats.tagged} · in README: ${catalog.stats.matchedInReadme}`);
+console.log(`  health: ${healthCount ? `${healthCount} blogs with real dates from data/health.json` : "none — falling back to the README rank"}`);
 const freshest = catalog.blogs.filter((b) => !b.dead).sort((a, b) => b.fresh - a.fresh)[0];
 if (freshest) console.log(`  latest post: ${freshest.name}`);

@@ -112,7 +112,11 @@ export function parseCsv(text) {
   return rows;
 }
 
-const FEED_ROW = /^\|\s*\[Feed\]\(([^)]*)\)\s*\|\s*(.*?)\s*\|\s*(https?:\/\/[^|]*?)\s*\|\s*(.*?)\s*\|?\s*$/i;
+// The Feed cell is `[Feed](url)` when the blog has a feed, or `None` when it
+// does not. Both are rows of the table, and the second kind used to be skipped
+// entirely — see noFeed below.
+const FEED_ROW =
+  /^\|\s*(?:\[Feed\]\(([^)]*)\)|(None))\s*\|\s*(.*?)\s*\|\s*(https?:\/\/[^|]*?)\s*\|\s*(.*?)\s*\|?\s*$/i;
 
 /**
  * Parse the generated README table.
@@ -133,10 +137,10 @@ export function parseReadme(text) {
     if (feedMatch) {
       if (inDead) continue;
       active.push({
-        name: feedMatch[2].trim(),
-        url: feedMatch[3].trim(),
-        feed: feedMatch[1].trim(),
-        tags: splitTags(feedMatch[4]),
+        name: feedMatch[3].trim(),
+        url: feedMatch[4].trim(),
+        feed: (feedMatch[1] || '').trim(),
+        tags: splitTags(feedMatch[5]),
       });
       continue;
     }
@@ -155,19 +159,44 @@ export function parseReadme(text) {
  * Build the city catalog.
  * @returns {{ generatedAt: string, source: string, stats: object, blogs: object[] }}
  */
-export function buildCatalog({ csvText, readmeText, generatedAt }) {
+export function buildCatalog({ csvText, readmeText, health, generatedAt, now }) {
   const rows = parseCsv(csvText);
   const { active, dead } = parseReadme(readmeText);
+  const healthById = health instanceof Map ? health : new Map(Object.entries(health || {}));
+  const nowMs = now ?? Date.now();
 
-  const total = Math.max(1, active.length);
+  // Rank is counted over the rows that actually have a feed: the no-feed rows
+  // sit at the tail of the table and must not stretch everyone else's scale.
+  const ranked = active.filter((b) => b.feed);
+  const total = Math.max(1, ranked.length);
   const state = new Map();
-  active.forEach((b, i) => {
-    state.set(blogId(b.url), { fresh: 1 - i / total, dead: false, reason: '' });
+  ranked.forEach((b, i) => {
+    state.set(blogId(b.url), { fresh: 1 - i / total, dead: false, reason: '', noFeed: false });
   });
+  for (const b of active) {
+    if (b.feed) continue;
+    // No RSS: never checked, never will be. Treat it as quiet, not as "new".
+    state.set(blogId(b.url), { fresh: 0, dead: false, reason: '', noFeed: true });
+  }
   for (const b of dead) {
     const id = blogId(b.url);
     if (state.has(id) && !state.get(id).dead) continue; // still listed as alive
-    state.set(id, { fresh: 0, dead: true, reason: b.reason });
+    state.set(id, { fresh: 0, dead: true, reason: b.reason, noFeed: false });
+  }
+
+  // Our own crawl, when present, beats the README: it carries real timestamps,
+  // so freshness is a decay curve in time instead of a rank percentile.
+  for (const [id, h] of healthById) {
+    const prev = state.get(id) ?? { fresh: 0, dead: false, reason: '', noFeed: false };
+    if (h.deadSince) {
+      state.set(id, { ...prev, fresh: 0, dead: true, reason: h.reason || prev.reason });
+      continue;
+    }
+    if (h.lastPostAt) {
+      const ageDays = Math.max(0, (nowMs - h.lastPostAt * 1000) / 86400000);
+      // Hyperbolic decay: 1 day ≈ 0.99, 30 ≈ 0.75, 90 ≈ 0.5, 1 year ≈ 0.2
+      state.set(id, { ...prev, fresh: Math.round((1 / (1 + ageDays / 90)) * 1000) / 1000, dead: false });
+    }
   }
 
   const blogs = rows.map((row, index) => {
@@ -182,10 +211,12 @@ export function buildCatalog({ csvText, readmeText, generatedAt }) {
       tags: row.tags,
       dead: st ? st.dead : false,
       reason: st && st.reason ? st.reason : '',
-      // 1 = most recently updated, 0 = long silent. Blogs missing from the
-      // README table are newer than the table itself (added by PR since the
-      // last sync), so they land near the top.
-      fresh: st ? Math.round(st.fresh * 1000) / 1000 : 0.8,
+      ...(st?.noFeed && { noFeed: true }),
+      ...(healthById.get(id)?.lastPostAt && { lastPostAt: healthById.get(id).lastPostAt }),
+      // 1 = most recently updated, 0 = long silent. Unknown blogs (added to the
+      // CSV after the last README render) start mid-scale rather than near the
+      // top: we genuinely do not know how active they are yet.
+      fresh: st ? Math.round(st.fresh * 1000) / 1000 : 0.5,
     };
   });
 

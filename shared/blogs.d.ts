@@ -7,6 +7,10 @@ export interface Blog {
   tags: string[];
   dead: boolean;
   reason: string;
+  /** no RSS in the source list: the blog can never be checked */
+  noFeed?: boolean;
+  /** unix seconds of the newest post, when our own crawl has seen the feed */
+  lastPostAt?: number;
   fresh: number;
 }
 
@@ -37,10 +41,19 @@ export function parseReadme(text: string): {
   active: { name: string; url: string; feed: string; tags: string[] }[];
   dead: { name: string; url: string; reason: string }[];
 };
+export interface HealthEntry {
+  lastPostAt?: number;
+  failingSince?: number;
+  deadSince?: number;
+  reason?: string;
+}
+
 export function buildCatalog(input: {
   csvText: string;
   readmeText: string;
+  health?: Record<string, HealthEntry> | Map<string, HealthEntry>;
   generatedAt?: string;
+  now?: number;
 }): Catalog;
 
 export const CATEGORIES: CategoryDef[];
