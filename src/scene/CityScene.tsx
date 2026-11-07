@@ -22,6 +22,8 @@ interface Home {
   pos: THREE.Vector3;
   target: THREE.Vector3;
   distance: number;
+  /** how far the orbit pivot may be panned away from downtown */
+  bound: number;
 }
 
 // the camera and the fog now derive from the actual city footprint, so the
@@ -38,6 +40,8 @@ function homeFor(layout: CityLayout): Home {
     pos: new THREE.Vector3(d * 0.56, d * 0.6, d * 0.8),
     target: new THREE.Vector3(0, 16, 0),
     distance: d,
+    // a little past the last tower: you can pan to the edge, not into the void
+    bound: Math.max(340, reach * 1.12),
   };
 }
 
@@ -63,6 +67,33 @@ function Rig({ focus, homeToken, home }: { focus: FocusTarget | null; homeToken:
   const controls = useRef<OrbitControlsImpl | null>(null);
   const { camera } = useThree();
   const reduce = useReducedMotion();
+
+  // Seed the pivot from `home` once. This is done here instead of through the
+  // `target` prop: drei would then hand the controls the very Vector3 that
+  // `home` owns, and the pan clamp below would rewrite `home` in place.
+  useEffect(() => {
+    const ctl = controls.current;
+    if (!ctl) return;
+    ctl.target.copy(home.target);
+    ctl.update();
+  }, [home]);
+
+  // OrbitControls has no pan limit, so the pivot is clamped after each frame
+  // and the camera is shifted by the same delta — the view angle never changes.
+  const clampPivot = () => {
+    const ctl = controls.current;
+    if (!ctl) return;
+    const t = ctl.target;
+    const nx = THREE.MathUtils.clamp(t.x, -home.bound, home.bound);
+    const ny = THREE.MathUtils.clamp(t.y, 0, 240);
+    const nz = THREE.MathUtils.clamp(t.z, -home.bound, home.bound);
+    if (nx === t.x && ny === t.y && nz === t.z) return;
+    camera.position.x += nx - t.x;
+    camera.position.y += ny - t.y;
+    camera.position.z += nz - t.z;
+    t.set(nx, ny, nz);
+    ctl.update();
+  };
   const flight = useRef<Flight>({
     active: false,
     t: 1,
@@ -146,7 +177,9 @@ function Rig({ focus, homeToken, home }: { focus: FocusTarget | null; homeToken:
       }
       return;
     }
-    // OrbitControls keeps itself up to date (damping + auto-rotate)
+    // OrbitControls keeps itself up to date (damping + auto-rotate); all that
+    // is left is keeping the pivot inside the city
+    clampPivot();
   });
 
   return (
@@ -158,7 +191,6 @@ function Rig({ focus, homeToken, home }: { focus: FocusTarget | null; homeToken:
       minDistance={32}
       maxDistance={home.distance * ZOOM_MAX_FACTOR}
       maxPolarAngle={MAX_TILT}
-      target={home.target}
       autoRotate
       autoRotateSpeed={AUTO_ROTATE_SPEED}
       mouseButtons={{
@@ -306,7 +338,7 @@ export default function CityScene({
       {/* the only light in the scene: it shades the trees and the monument,
           everything else is unlit shaders */}
       <hemisphereLight args={["#3d5c8c", "#0a0f18", 2.1]} />
-      <Ground layout={layout} fog={fog} />
+      <Ground layout={layout} />
       <Roads layout={layout} />
       <Roundabout layout={layout} />
       <Traffic layout={layout} />

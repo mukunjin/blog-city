@@ -9,7 +9,7 @@ export const PALETTE = {
   skyHorizon: "#1b2b52",
   skyBottom: "#080b13",
   fog: "#080b13",
-  ground: "#080b13",
+  ground: "#04060a",
   plinth: "#101724",
   road: "#1c2637",
 };
@@ -287,36 +287,12 @@ export function Moon() {
 // One plane, one colour everywhere: no slabs, no light pools. A whisper of
 // grain keeps it from looking flat, and it dissolves into the fog by distance.
 
-const groundVertex = /* glsl */ `
-  varying vec3 vWorld;
-  void main() {
-    vec4 world = modelMatrix * vec4(position, 1.0);
-    vWorld = world.xyz;
-    gl_Position = projectionMatrix * viewMatrix * world;
-  }
-`;
+// The floor is a plain black disc. No shader: at this scale the only thing
+// that matters is that it never ends on screen, so it is drawn far past the
+// camera's far plane and the scene fog does the rest.
+const GROUND_RADIUS = 26000;
 
-const groundFragment = /* glsl */ `
-  uniform vec3 uGround;
-  uniform vec3 uFog;
-  uniform float uNear;
-  uniform float uFar;
-  varying vec3 vWorld;
-  void main() {
-    float g = fract(sin(dot(floor(vWorld.xz * 3.0), vec2(12.9898, 78.233))) * 43758.5453);
-    vec3 col = uGround * (0.975 + g * 0.05);
-    float d = length(cameraPosition - vWorld);
-    gl_FragColor = vec4(mix(col, uFog, smoothstep(uNear, uFar, d)), 1.0);
-  }
-`;
-
-export function Ground({
-  layout,
-  fog,
-}: {
-  layout: CityLayout;
-  fog: { color: string; near: number; far: number };
-}) {
+export function Ground({ layout }: { layout: CityLayout }) {
   // one shallow pad under each tower — a plinth, not a city block grid
   const plinths = useMemo(() => {
     const geo = new THREE.BoxGeometry(1, 1, 1);
@@ -338,22 +314,6 @@ export function Ground({
     return mesh;
   }, [layout.buildings]);
 
-  const groundMaterial = useMemo(
-    () =>
-      new THREE.ShaderMaterial({
-        vertexShader: groundVertex,
-        fragmentShader: groundFragment,
-        uniforms: {
-          uGround: { value: new THREE.Color(PALETTE.ground) },
-          uFog: { value: new THREE.Color(fog.color) },
-          uNear: { value: fog.near },
-          uFar: { value: fog.far },
-        },
-        fog: false,
-      }),
-    [fog.color, fog.near, fog.far],
-  );
-
   // a ring road around the settled area, so the city has an edge
   const reach = Math.max(
     Math.abs(layout.extent.minX),
@@ -366,8 +326,9 @@ export function Ground({
 
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} material={groundMaterial}>
-        <planeGeometry args={[9000, 9000]} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
+        <circleGeometry args={[GROUND_RADIUS, 64]} />
+        <meshBasicMaterial color={PALETTE.ground} />
       </mesh>
 
       <primitive object={plinths} />
