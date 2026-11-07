@@ -193,16 +193,10 @@ function Rig({ focus, homeToken, home }: { focus: FocusTarget | null; homeToken:
       maxPolarAngle={MAX_TILT}
       autoRotate
       autoRotateSpeed={AUTO_ROTATE_SPEED}
-      mouseButtons={{
-        LEFT: THREE.MOUSE.PAN,
-        MIDDLE: THREE.MOUSE.DOLLY,
-        RIGHT: THREE.MOUSE.ROTATE,
-      }}
-      touches={{ ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE }}
+      // plain OrbitControls bindings: left drag orbits, right drag pans, wheel
+      // zooms. The map-style remap (left = pan, zoom to cursor) never felt
+      // right here, so it is gone along with its key handler.
       screenSpacePanning={false}
-      zoomToCursor
-      keyEvents
-      keyPanSpeed={40}
       onStart={() => {
         // grabbing the city mid-flight takes over instantly
         userMoved.current = true;

@@ -7,8 +7,6 @@ import CityScene, { type FocusTarget } from "./scene/CityScene";
 import Hud from "./ui/Hud";
 import BlogPanel from "./ui/BlogPanel";
 import Directory from "./ui/Directory";
-import About from "./ui/About";
-import Help from "./ui/Help";
 
 const catalog = catalogJson as unknown as Catalog;
 
@@ -21,8 +19,6 @@ export default function App() {
   const [focus, setFocus] = useState<FocusTarget | null>(null);
   const [homeToken, setHomeToken] = useState(0);
   const [dirOpen, setDirOpen] = useState(false);
-  const [aboutOpen, setAboutOpen] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
   const [pointer, setPointer] = useState({ x: 0, y: 0 });
 
   const tokenRef = useRef(0);
@@ -82,11 +78,8 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setDirOpen(false);
-        setAboutOpen(false);
-        setHelpOpen(false);
         select(null);
       }
-      if (e.key === "?" && document.activeElement?.tagName !== "INPUT") setHelpOpen((v) => !v);
       if (e.key === "r" && !e.metaKey && !e.ctrlKey && document.activeElement?.tagName !== "INPUT") random();
     };
     window.addEventListener("keydown", onKey);
@@ -112,8 +105,6 @@ export default function App() {
           stats={catalog.stats}
           onDirectory={() => setDirOpen(true)}
           onRandom={random}
-          onAbout={() => setAboutOpen(true)}
-          onHelp={() => setHelpOpen(true)}
         />
 
         <BlogPanel building={selected} onClose={() => select(null)} onRandom={random} />
@@ -139,16 +130,8 @@ export default function App() {
         </div>
       )}
 
-      <Help open={helpOpen} onClose={() => setHelpOpen(false)} />
-
       <Directory open={dirOpen} blogs={catalog.blogs} onClose={() => setDirOpen(false)} onPick={pickBlog} />
 
-      <About
-        open={aboutOpen}
-        onClose={() => setAboutOpen(false)}
-        stats={catalog.stats}
-        generatedAt={catalog.generatedAt}
-      />
     </div>
   );
 }

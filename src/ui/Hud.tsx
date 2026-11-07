@@ -4,13 +4,11 @@ interface HudProps {
   stats: CatalogStats;
   onDirectory: () => void;
   onRandom: () => void;
-  onAbout: () => void;
-  onHelp: () => void;
 }
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 
-export default function Hud({ stats, onDirectory, onRandom, onAbout, onHelp }: HudProps) {
+export default function Hud({ stats, onDirectory, onRandom }: HudProps) {
   return (
     <>
       <header className="brand">
@@ -30,16 +28,10 @@ export default function Hud({ stats, onDirectory, onRandom, onAbout, onHelp }: H
         <button className="btn" onClick={onRandom}>
           随机
         </button>
-        <button className="btn" onClick={onAbout}>
-          关于
-        </button>
-        <button className="btn" onClick={onHelp} aria-label="操作说明">
-          操作
-        </button>
       </div>
 
       <p className="hint">
-        左键平移 · 右键旋转 · 滚轮缩放 · 点击大厦 · <kbd>R</kbd> 随机 · <kbd>?</kbd> 操作
+        拖动旋转 · 滚轮缩放 · 点击大厦 · <kbd>R</kbd> 随机 · <kbd>Esc</kbd> 关闭
       </p>
     </>
   );
