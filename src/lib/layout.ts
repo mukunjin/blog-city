@@ -37,11 +37,18 @@ function overlaps(a: Rect, b: Rect, gap: number): boolean {
 export function buildCity(blogs: Blog[]): CityLayout {
   const members = [...blogs].sort((a, b) => b.fresh - a.fresh || a.num - b.num);
   const n = members.length;
-  const specs = members.map((b) => buildingMetrics(b));
+  // The rank feeds the height ladder: 1 for the freshest alive blog, 0 for the
+  // least recently updated one. Dead blogs sit at the end of `members` and are
+  // ranked out on purpose — they have their own short, dark shape, and giving
+  // them slots at the bottom would squash every living tower into the top half.
+  const alive = members.filter((b) => !b.dead).length;
+  const specs = members.map((b, i) =>
+    buildingMetrics(b, b.dead || alive < 2 ? 0 : 1 - i / (alive - 1)),
+  );
 
   // footprints up front, so the city radius can be budgeted before placement
   const feet = specs.map((s) => {
-    const size = 7.6 + s.breadth * 3.8 + rand01(s.seed ^ 0x2f) * 1.8;
+    const size = 9.4 + s.breadth * 4.6 + rand01(s.seed ^ 0x2f) * 2.2;
     return { w: size, d: size * (0.9 + rand01(s.seed ^ 0x1b3f) * 0.22) };
   });
 

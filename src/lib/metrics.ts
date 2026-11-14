@@ -32,6 +32,23 @@ const MAX_HEIGHT = 214;
 const MIN_HEIGHT = 14;
 
 /**
+ * Height is a ladder, not a straight line in age.
+ *
+ * The list is bimodal: about a tenth of the blogs posted this week while half
+ * have been silent for over a year. Mapping freshness straight into height put
+ * every active tower in one band near the top and every quiet one in a band
+ * near the bottom, so a blog that went quiet last month could stand taller than
+ * one that posted yesterday.
+ *
+ * Ranking first (pct = 1 for the most recently updated, 0 for the last), then
+ * curving with ^1.2, gives each activity band its own slice of the skyline: no
+ * overlap between bands, and the top ~100 towers still climb above the rest.
+ */
+function rankScore(pct: number): number {
+  return Math.pow(Math.max(0, Math.min(1, pct)), 1.2);
+}
+
+/**
  * The visual encoding, and the only place the city makes a claim about a blog:
  *
  *   height ← 活跃度（在这份列表里的更新排序）+ 标签广度
@@ -41,7 +58,7 @@ const MIN_HEIGHT = 14;
  *
  * Everything is deterministic, so the same blog always gets the same tower.
  */
-export function buildingMetrics(blog: Blog): BuildingMetrics {
+export function buildingMetrics(blog: Blog, pct = blog.fresh): BuildingMetrics {
   const seed = hashStr(blog.id);
   const jitter = rand01(seed);
   const breadth = Math.min(blog.tags.length, 8) / 8;
@@ -56,7 +73,9 @@ export function buildingMetrics(blog: Blog): BuildingMetrics {
     };
   }
 
-  const score = 0.6 * Math.pow(fresh, 0.5) + 0.26 * Math.pow(breadth, 0.65) + 0.14 * jitter;
+  // 20% absolute freshness keeps the encoding honest (a tower still reflects
+  // real time since the last post), 80% rank does the visual spreading.
+  const score = 0.2 * Math.pow(fresh, 0.9) + 0.8 * rankScore(pct);
   return {
     height: MIN_HEIGHT + (MAX_HEIGHT - MIN_HEIGHT) * score,
     lit: 0.08 + 0.8 * Math.pow(fresh, 0.75),
