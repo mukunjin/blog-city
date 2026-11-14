@@ -22,6 +22,8 @@ interface Home {
   pos: THREE.Vector3;
   target: THREE.Vector3;
   distance: number;
+  /** how far the last tower sits from downtown, in world units */
+  reach: number;
   /** how far the orbit pivot may be panned away from downtown */
   bound: number;
 }
@@ -35,11 +37,14 @@ function homeFor(layout: CityLayout): Home {
     Math.abs(layout.extent.minZ),
     layout.extent.maxZ,
   );
-  const d = Math.max(360, reach * 2.05);
+  // 1.62 instead of 2.05: the skyline now fills the frame on load instead of
+  // floating in the middle of it, and there is still room to pull back (1.45x)
+  const d = Math.max(320, reach * 1.62);
   return {
     pos: new THREE.Vector3(d * 0.56, d * 0.6, d * 0.8),
     target: new THREE.Vector3(0, 16, 0),
     distance: d,
+    reach,
     // a little past the last tower: you can pan to the edge, not into the void
     bound: Math.max(340, reach * 1.12),
   };
@@ -299,8 +304,10 @@ export default function CityScene({
   onSelect,
 }: CitySceneProps) {
   const home = useMemo(() => homeFor(layout), [layout]);
+  // haze is measured against the city, not the camera: moving closer must not
+  // swallow the far side of town
   const fog = useMemo(
-    () => ({ color: PALETTE.fog, near: home.distance * 0.8, far: home.distance * 2.3 }),
+    () => ({ color: PALETTE.fog, near: home.reach * 1.35, far: home.reach * 2.9 }),
     [home],
   );
   // a press that turned into an orbit drag must not count as "clicked the sky"

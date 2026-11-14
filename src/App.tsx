@@ -103,6 +103,7 @@ export default function App() {
       <div className="ui">
         <Hud
           stats={catalog.stats}
+          snapshot={catalog.generatedAt}
           onDirectory={() => setDirOpen(true)}
           onRandom={random}
         />
