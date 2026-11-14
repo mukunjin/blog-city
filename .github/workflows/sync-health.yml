@@ -1,10 +1,14 @@
 name: sync-health
 
-# Weekly, Thursday 02:17 UTC = 10:17 in Beijing. Off the hour on purpose:
-# GitHub's scheduler queues hard at :00 and can run 20+ minutes late.
+# Daily, 02:17 UTC = 10:17 in Beijing. Off the hour on purpose: GitHub's
+# scheduler queues hard at :00 and can run 20+ minutes late.
+#
+# Daily rather than weekly because a static build freezes whatever it saw: a
+# weekly sync left the tower count up to seven days behind the list, which read
+# as "the numbers are wrong".
 on:
   schedule:
-    - cron: "17 2 * * 4"
+    - cron: "17 2 * * *"
   # Also run when this pipeline itself changes, so the first deploy already has
   # data and a fix gets exercised immediately. Data commits below do not match
   # these paths, so there is no loop.
@@ -40,11 +44,12 @@ jobs:
       - name: Commit the snapshot
         id: commit
         run: |
-          # Only the health snapshot decides whether this is news. blogs.json is
-          # rewritten on every run (it carries a generatedAt), so it must not be
-          # the trigger or we would redeploy daily for nothing.
-          if [ -z "$(git status --porcelain data/health.json)" ]; then
-            echo "health.json unchanged — skipping commit"
+          # Both files are byte-stable when nothing changed: build-blogs keeps
+          # the old generatedAt when the payload is identical. So an empty
+          # porcelain here means "no new facts", and committing would only
+          # trigger a pointless rebuild.
+          if [ -z "$(git status --porcelain data/health.json src/data/blogs.json)" ]; then
+            echo "no new data — skipping commit"
             exit 0
           fi
           echo "pushed=true" >> "$GITHUB_OUTPUT"

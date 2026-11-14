@@ -16,6 +16,8 @@ export interface Blog {
 
 export interface CatalogStats {
   total: number;
+  /** towers not flagged as dead */
+  alive: number;
   dead: number;
   tagged: number;
   matchedInReadme: number;

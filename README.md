@@ -51,7 +51,7 @@ npm run refresh    # 上面两步的合并版：拉接口 + 拉最新 CSV/README
 
 - **每小时**：`frontend/worker` 的 cron（`7 * * * *`）检测到期的 RSS，写进 D1；
 - **每天**：GitHub Actions（`updateInfo.yml`）把结果渲染进 README 并提交；
-- 我们每**周四**拉一次它的状态接口，有变化才提交（`.github/workflows/sync-health.yml`）。
+- 我们**每天**拉一次它的状态接口，只有数据真的变了才提交（`.github/workflows/sync-health.yml`）。
 
 ## 计算公式
 
@@ -212,7 +212,7 @@ main   → https://play.mukunjin.com                 （生产）
 
 ### 数据怎么更新
 
-`.github/workflows/sync-health.yml`，每周四 10:17（北京时间）：
+`.github/workflows/sync-health.yml`，每天 10:17（北京时间）：
 
 ```
 拉一次状态接口
@@ -220,7 +220,7 @@ main   → https://play.mukunjin.com                 （生产）
  └─ 快照变了 → commit & push → Pages 自动重建 → 上线
 ```
 
-想改成每天或每小时，改那行 `cron`（构建次数上限 500 次/月，现在用不到 5%）。
+想改成每周或每小时，改那行 `cron`（构建次数上限 500 次/月，现在用不到 5%）。
 
 ### 可选的加固
 

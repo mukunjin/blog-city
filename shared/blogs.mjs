@@ -160,7 +160,20 @@ export function parseReadme(text) {
  * @returns {{ generatedAt: string, source: string, stats: object, blogs: object[] }}
  */
 export function buildCatalog({ csvText, readmeText, health, generatedAt, now }) {
-  const rows = parseCsv(csvText);
+  const parsed = parseCsv(csvText);
+  // Deduplicate by id: upstream sometimes carries the same site on two rows
+  // while an edit is in review, and a duplicate would become a second tower.
+  const seen = new Set();
+  const rows = parsed.filter((row) => {
+    const id = blogId(row.url);
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+  if (rows.length !== parsed.length) {
+    console.warn(`! dropped ${parsed.length - rows.length} duplicate row(s) from the csv`);
+  }
+
   const { active, dead } = parseReadme(readmeText);
   const healthById = health instanceof Map ? health : new Map(Object.entries(health || {}));
   const nowMs = now ?? Date.now();
@@ -228,6 +241,8 @@ export function buildCatalog({ csvText, readmeText, health, generatedAt, now }) 
     source: 'chinese-independent-blogs',
     stats: {
       total: blogs.length,
+      // what a visitor can act on: every tower minus the dark ones
+      alive: blogs.length - deadCount,
       dead: deadCount,
       tagged: blogs.filter((b) => b.tags.length > 0).length,
       matchedInReadme: blogs.filter((b) => state.has(b.id)).length,
