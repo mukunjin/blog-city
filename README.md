@@ -259,6 +259,39 @@ main   → https://play.mukunjin.com                 （生产）
 
 想改成每周或每小时，改 `.github/workflows/sync-health.yml` 里那行 `cron` 即可（构建额度 500 次/月，现在用不到 5%）。
 
+### push 被拒绝怎么办
+
+远端每天有一台机器人提交数据，本地放几天再推一定会落后。看到这个就够了：
+
+```
+! [rejected]  main -> main (fetch first)
+```
+
+三步解决：
+
+```bash
+git fetch origin
+git merge origin/main --no-edit
+git push
+```
+
+冲突通常只在两个数据文件里，一律用本地那份（它是最新同步的）：
+
+```bash
+git checkout --ours -- data src/data/blogs.json
+npm run data
+git add -A
+git commit -m "chore: merge the bot's data sync"
+git push
+```
+
+两点说明：
+
+- **用 merge，不用 rebase**。rebase 过程中 `--ours` 指上游、`--theirs` 才指自己，很容易把数据取反；merge 里 `--ours` 就是当前分支。
+- **`npm run data` 不能省**。它用 `data/` 里最新的 CSV 与状态重新生成 `src/data/blogs.json`，否则可能出现两个文件对应不同日期。
+
+养成习惯：推之前先 `git fetch` 看 `git status -sb`，`behind` 不为 0 就先合并。
+
 ### 手动部署（一般用不上）
 
 ```bash
