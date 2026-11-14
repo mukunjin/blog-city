@@ -13,7 +13,7 @@
   <a href="https://threejs.org"><img height="20" alt="three.js" src="https://img.shields.io/badge/three.js-000000?logo=threedotjs&logoColor=white&style=flat-square" /></a>
   <a href="https://vitejs.dev"><img height="20" alt="Vite" src="https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white&style=flat-square" /></a>
   <a href="https://pages.cloudflare.com"><img height="20" alt="Cloudflare Pages" src="https://img.shields.io/badge/Cloudflare_Pages-F38020?logo=cloudflarepages&logoColor=white&style=flat-square" /></a>
-  <a href="LICENSE"><img height="20" alt="GPLv3 License" src="https://img.shields.io/badge/license-GPLv3-FFCF7A?style=flat-square&labelColor=0b1018" /></a>
+  <a href="LICENSE"><img height="20" alt="MIT License" src="https://img.shields.io/badge/license-MIT-FFCF7A?style=flat-square&labelColor=0b1018" /></a>
 </p>
 
 把[中文独立博客列表](https://github.com/timqian/chinese-independent-blogs)变成一座 3D 像素城市：
@@ -333,6 +333,6 @@ data/                   上游名单与状态快照的本地副本
 ## 数据与致谢
 
 - 名单来自 [timqian/chinese-independent-blogs](https://github.com/timqian/chinese-independent-blogs)，MIT License。
-- 本项目以 [GPL-3.0](LICENSE) 发布。
+- 本项目以 [MIT](LICENSE) 发布。
 - 3D 城市的玩法参考了 [srizzon/git-city](https://github.com/srizzon/git-city)（AGPL-3.0）；本项目代码为独立实现，未复制其源码。
 - 楼体、天空、地面均为自制 shader，无第三方美术资源。
