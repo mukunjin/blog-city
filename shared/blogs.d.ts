@@ -20,7 +20,8 @@ export interface CatalogStats {
   alive: number;
   dead: number;
   tagged: number;
-  matchedInReadme: number;
+  /** blogs whose last post time is known */
+  dated: number;
 }
 
 export interface Catalog {
@@ -52,7 +53,8 @@ export interface HealthEntry {
 
 export function buildCatalog(input: {
   csvText: string;
-  readmeText: string;
+  /** optional: only used as a fallback ranking when the status snapshot is absent */
+  readmeText?: string;
   health?: Record<string, HealthEntry> | Map<string, HealthEntry>;
   generatedAt?: string;
   now?: number;

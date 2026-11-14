@@ -37,11 +37,14 @@ jobs:
         with:
           node-version: 22
 
-      - name: Pull the status API
+      # Pulls the csv mirror and the status api into data/, then rebuilds the
+      # committed snapshot. Both steps are offline-safe: if the network is down
+      # the run fails here and the committed files stay untouched.
+      - name: Pull the csv and the status api
         run: node scripts/sync-health.mjs
 
       - name: Rebuild the city data
-        run: node scripts/build-blogs.mjs --remote
+        run: node scripts/build-blogs.mjs
 
       - name: Commit the snapshot
         id: commit
@@ -50,14 +53,14 @@ jobs:
           # the old generatedAt when the payload is identical. So an empty
           # porcelain here means "no new facts", and committing would only
           # trigger a pointless rebuild.
-          if [ -z "$(git status --porcelain data/health.json src/data/blogs.json)" ]; then
+          if [ -z "$(git status --porcelain data/blogs-original.csv data/health.json src/data/blogs.json)" ]; then
             echo "no new data — skipping commit"
             exit 0
           fi
           echo "pushed=true" >> "$GITHUB_OUTPUT"
           git config user.name "blog-city-bot"
           git config user.email "blog-city-bot@users.noreply.github.com"
-          git add data/health.json src/data/blogs.json
+          git add data/blogs-original.csv data/health.json src/data/blogs.json
           git commit -m "chore(data): sync blog health"
           git push
 

@@ -28,30 +28,34 @@ npm run dev          # http://localhost:3210
 
 ## 数据从哪来
 
-三个来源，全部在**构建时**合并，浏览器里不做任何请求：
+两份文件放在 `data/` 里，**都提交进仓库**，构建时只读它们、不碰网络：
 
-| 来源 | 提供什么 | 取法 |
+| 文件 | 是什么 | 谁更新 |
 | --- | --- | --- |
-| `blogs-original.csv` | 名单本体：名称、网址、RSS、标签 | jsDelivr 镜像（raw.githubusercontent 在国内常被墙） |
-| `indi.blog/api/blogs.json` | 每篇博客最近发文时间、是否失效、失败原因 | `npm run health` |
-| `README.md` | 兜底：没有状态快照时按表格名次算活跃度 | 同 CSV |
+| `data/blogs-original.csv` | 上游名单的副本：名称、网址、RSS、标签 | `npm run sync` 从 jsDelivr 镜像拉（raw.githubusercontent 在国内常被墙） |
+| `data/health.json` | 每篇博客最近发文时间、是否失效、失败原因 | `npm run sync` 拉 `indi.blog/api/blogs.json` |
 
-`src/data/blogs.json` 是三者合并的结果（博客数量随上游名单变化，不在代码里写死）：
+`src/data/blogs.json` 是两者的合并结果（博客数量随名单变化，代码里不写死）：
 
 ```bash
-npm run health     # 拉一次状态接口 → data/health.json（1 个请求，约 1 秒）
-npm run data       # 用本地 clone 的 CSV/README 重建城市快照
-npm run refresh    # 上面两步的合并版：拉接口 + 拉最新 CSV/README + 重建
+npm run sync     # 拉 CSV + 状态接口，覆盖 data/ 下两份文件，然后重算城市快照
+npm run data     # 只重算：data/ 的 CSV + health → src/data/blogs.json（零网络）
 ```
 
-数据是**构建时打进包里**的，所以同步完要重新 `npm run build` 才会有新城市。
-线上由 Cloudflare Pages 在每次 push 时构建。
+为什么把 CSV 存进仓库，而不是构建时去拉：
 
-上游的检测节奏（已核对它的仓库）：
+- **可复现**：同一个提交永远生成同一座城市，数字不会因为「今天 CDN 给了哪一版」而变；
+- **构建不依赖网络**：Pages 构建只跑本地脚本，CDN 抽风不会让发布失败；
+- **看得见**：上游加了哪个博客、改了哪一行，`git diff` 里就有，不藏在一次远程请求里。
 
-- **每小时**：`frontend/worker` 的 cron（`7 * * * *`）检测到期的 RSS，写进 D1；
-- **每天**：GitHub Actions（`updateInfo.yml`）把结果渲染进 README 并提交；
-- 我们**每天**拉一次它的状态接口，只有数据真的变了才提交（`.github/workflows/sync-health.yml`）。
+代价是新鲜度等于「上次同步」：`.github/workflows/sync-health.yml` 每天 09:43（北京时间）拉一次，
+**有变化才提交**，提交才触发部署。
+
+上游的检测节奏（核对过它的仓库）：
+
+- **每小时**：它的 Worker 检测到期的 RSS，写进 D1；
+- **每天**：它的 Actions 把结果渲染进 README 并提交；
+- **每天**：我们拉一次它的公开状态接口和名单 CSV。
 
 ## 计算公式
 
@@ -190,7 +194,7 @@ Build output:      dist
 
 就这两个字段要填。**不要**在面板里写长命令或配 `NODE_VERSION`：
 
-- 构建命令收在 `package.json` 的 `build:ci` 里（`(重建数据 || true) && vite build`），面板里只有一句，改逻辑改仓库即可，不会出现「面板和仓库不一致」；
+- 构建命令收在 `package.json` 的 `build:ci` 里（`node scripts/build-blogs.mjs && vite build`，纯本地、不联网），面板里只有一句，改逻辑改仓库即可，不会出现「面板和仓库不一致」；
 - Node 版本由仓库里的 `.node-version` 文件指定（`22`），Pages 的构建镜像会读它。
 
 保存后得到 `https://blog-city.pages.dev`；绑上自定义域名后正式地址是 **https://play.mukunjin.com**。
@@ -244,12 +248,11 @@ npm run deploy    # = build + wrangler pages deploy dist --project-name blog-cit
 
 ## 添加新博客
 
-1. 往 `chinese-independent-blogs/blogs-original.csv` 尾部加一行：`名称, 网址, RSS, 标签`
-   （长期做法是给上游仓库提 PR，让所有人都有这栋楼）；
-2. `npm run refresh` 重新拉数据并生成城市快照；
-3. `git push` 发布。
+1. 给上游仓库的 `blogs-original.csv` 提 PR 加一行：`名称, 网址, RSS, 标签`；
+2. 上游合并后，本地跑 `npm run sync`（拉最新 CSV + 状态，重算城市快照）；
+3. `git push` 发布。也可以什么都不做：CI 每天同步一次，第二天自动带上新楼。
 
-还没进 README 的新博客会按「最新收录」处理，先给一个偏高的活跃度；等上游把 README 同步之后，位置就按真实发文时间落定。
+刚加进来的博客第一次同步时通常还没有发文时间，会站在默认活跃度（0.5）附近；等上游抓到它的第一篇文章，楼高就按真实时间落定。
 
 ## 代码结构
 

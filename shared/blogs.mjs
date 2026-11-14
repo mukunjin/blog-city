@@ -174,7 +174,10 @@ export function buildCatalog({ csvText, readmeText, health, generatedAt, now }) 
     console.warn(`! dropped ${parsed.length - rows.length} duplicate row(s) from the csv`);
   }
 
-  const { active, dead } = parseReadme(readmeText);
+  // The README is optional: the csv holds the list, the status snapshot holds
+  // the dates and the dead flags. Without it the rank fallback is simply absent
+  // and an undated blog keeps the neutral default instead of a made-up rank.
+  const { active, dead } = readmeText ? parseReadme(readmeText) : { active: [], dead: [] };
   const healthById = health instanceof Map ? health : new Map(Object.entries(health || {}));
   const nowMs = now ?? Date.now();
 
@@ -190,6 +193,14 @@ export function buildCatalog({ csvText, readmeText, health, generatedAt, now }) 
     if (b.feed) continue;
     // No RSS: never checked, never will be. Treat it as quiet, not as "new".
     state.set(blogId(b.url), { fresh: 0, dead: false, reason: '', noFeed: true });
+  }
+  // No README to read, but the csv still says who has no feed at all: an empty
+  // RSS column means the blog can never be checked, so it must not be treated
+  // as an unknown-but-active site either.
+  for (const row of rows) {
+    const id = blogId(row.url);
+    if (row.feed || state.has(id)) continue;
+    state.set(id, { fresh: 0, dead: false, reason: '', noFeed: true });
   }
   for (const b of dead) {
     const id = blogId(b.url);
@@ -245,7 +256,8 @@ export function buildCatalog({ csvText, readmeText, health, generatedAt, now }) 
       alive: blogs.length - deadCount,
       dead: deadCount,
       tagged: blogs.filter((b) => b.tags.length > 0).length,
-      matchedInReadme: blogs.filter((b) => state.has(b.id)).length,
+      // how many towers carry a real last-post date (the rest are unknown)
+      dated: blogs.filter((b) => b.lastPostAt).length,
     },
     blogs,
   };
