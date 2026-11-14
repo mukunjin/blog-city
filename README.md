@@ -8,10 +8,18 @@
   <b><a href="https://play.mukunjin.com">play.mukunjin.com</a></b>
 </p>
 
+<p align="center">
+  <a href="https://react.dev"><img height="20" alt="React" src="https://img.shields.io/badge/React-61DAFB?logo=react&logoColor=white&style=flat-square" /></a>
+  <a href="https://threejs.org"><img height="20" alt="three.js" src="https://img.shields.io/badge/three.js-000000?logo=threedotjs&logoColor=white&style=flat-square" /></a>
+  <a href="https://vitejs.dev"><img height="20" alt="Vite" src="https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white&style=flat-square" /></a>
+  <a href="https://pages.cloudflare.com"><img height="20" alt="Cloudflare Pages" src="https://img.shields.io/badge/Cloudflare_Pages-F38020?logo=cloudflarepages&logoColor=white&style=flat-square" /></a>
+  <a href="LICENSE"><img height="20" alt="MIT License" src="https://img.shields.io/badge/license-MIT-FFCF7A?style=flat-square&labelColor=0b1018" /></a>
+</p>
+
 把[中文独立博客列表](https://github.com/timqian/chinese-independent-blogs)变成一座 3D 像素城市：
 **每个博客是一栋楼**，越活跃楼越高、灯越亮，久未更新的缩在城郊。
 
-![夜空下的城市：1581 座大厦，越新的博客灯越亮](docs/1.png)
+![夜空下的城市：越新的博客灯越亮](docs/1.png)
 
 ![点开一栋楼：楼高、活跃度、最近发文时间和标签，以及打开博客的入口](docs/2.png)
 
