@@ -24,10 +24,16 @@ const out = path.join(root, 'src', 'data', 'blogs.json');
 async function loadHealth() {
   try {
     const parsed = JSON.parse(await readFile(healthFile, 'utf8'));
-    if (!parsed?.blogs || !Object.keys(parsed.blogs).length) return { health: undefined, count: 0 };
-    return { health: parsed.blogs, count: Object.keys(parsed.blogs).length };
+    if (!parsed?.blogs || !Object.keys(parsed.blogs).length) {
+      return { health: undefined, count: 0, at: undefined };
+    }
+    return {
+      health: parsed.blogs,
+      count: Object.keys(parsed.blogs).length,
+      at: Date.parse(parsed.updatedAt ?? '') || undefined,
+    };
   } catch {
-    return { health: undefined, count: 0 };
+    return { health: undefined, count: 0, at: undefined };
   }
 }
 
@@ -39,10 +45,16 @@ try {
   process.exit(1);
 }
 
-const { health, count: healthCount } = await loadHealth();
+const { health, count: healthCount, at: snapshotAt } = await loadHealth();
 const catalog = buildCatalog({
   csvText,
   health,
+  // Freshness is measured against the snapshot's own timestamp, not against
+  // "now". Otherwise every rebuild decays every blog by another few hours,
+  // blogs.json changes on its own, and the daily job commits (and redeploys) for
+  // nothing. Tying it to the snapshot means an unchanged snapshot rebuilds to
+  // byte-identical output.
+  now: snapshotAt,
   generatedAt: new Date().toISOString(),
 });
 
