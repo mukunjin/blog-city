@@ -6,7 +6,7 @@ import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import Buildings from "./Buildings";
 import { Roads, Trees } from "./Streets";
 import { Roundabout, Traffic } from "./Downtown";
-import { Ground, Moon, PALETTE, Sky, Stars } from "./Backdrop";
+import { Ground, Moon, PALETTE, Sky } from "./Backdrop";
 import type { CityBuilding, CityLayout } from "../lib/types";
 import { useReducedMotion } from "../lib/usePresence";
 
@@ -311,7 +311,8 @@ function SkyDome() {
   });
   return (
     <group ref={group}>
-      <SkyDome />
+      <Sky />
+      <Moon />
     </group>
   );
 }
@@ -354,9 +355,7 @@ export default function CityScene({
       }}
     >
       <fog attach="fog" args={[fog.color, fog.near, fog.far]} />
-      <Sky />
-      <Stars />
-      <Moon />
+      <SkyDome />
       <ambientLight intensity={0.5} />
       {/* the only light in the scene: it shades the trees and the monument,
           everything else is unlit shaders */}
