@@ -32,7 +32,7 @@ npm run dev          # http://localhost:3210
 
 | 文件 | 是什么 | 谁更新 |
 | --- | --- | --- |
-| `data/blogs-original.csv` | 上游名单的副本：名称、网址、RSS、标签 | `npm run sync` 从 jsDelivr 镜像拉（raw.githubusercontent 在国内常被墙） |
+| `data/blogs-original.csv` | 上游名单的副本：名称、网址、RSS、标签 | `npm run sync` 从 GitHub 拉：CI 用 raw.github（无缓存），本地优先 jsDelivr（raw 在国内常被墙） |
 | `data/health.json` | 每篇博客最近发文时间、是否失效、失败原因 | `npm run sync` 拉 `indi.blog/api/blogs.json` |
 
 `src/data/blogs.json` 是两者的合并结果（博客数量随名单变化，代码里不写死）：
@@ -62,7 +62,7 @@ npm run data     # 只重算：data/ 的 CSV + health → src/data/blogs.json（
 每天 **09:43（北京时间）** 自动跑一次，定义在 `.github/workflows/sync-health.yml`。
 
 ```
-拉上游 CSV（jsDelivr → raw.github）   → data/blogs-original.csv
+拉上游 CSV（raw.github / jsDelivr）  → data/blogs-original.csv
 拉状态接口（1 个请求）               → data/health.json
 重算城市快照                         → src/data/blogs.json
                 ↓

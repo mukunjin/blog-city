@@ -36,10 +36,16 @@ const healthFile = path.join(root, 'data', 'health.json');
 const csvFile = path.join(root, 'data', 'blogs-original.csv');
 
 const API_URL = 'https://indi.blog/api/blogs.json';
-const CSV_MIRRORS = [
-  'https://cdn.jsdelivr.net/gh/timqian/chinese-independent-blogs@master/blogs-original.csv',
-  'https://raw.githubusercontent.com/timqian/chinese-independent-blogs/master/blogs-original.csv',
-];
+const CSV_RAW =
+  'https://raw.githubusercontent.com/timqian/chinese-independent-blogs/master/blogs-original.csv';
+// jsDelivr mirrors the same file, but caches it for hours.
+const CSV_JSDELIVR =
+  'https://cdn.jsdelivr.net/gh/timqian/chinese-independent-blogs@master/blogs-original.csv';
+
+// The order depends on where this runs. GitHub runners sit in Azure: raw.github
+// answers directly and is never stale. A home connection in China is usually the
+// other way round — raw times out, jsDelivr works. Second entry is the fallback.
+const CSV_MIRRORS = process.env.GITHUB_ACTIONS ? [CSV_RAW, CSV_JSDELIVR] : [CSV_JSDELIVR, CSV_RAW];
 const USER_AGENT =
   'Mozilla/5.0 (compatible; BlogCityBot/1.0; +https://github.com/timqian/chinese-independent-blogs)';
 const TIMEOUT_MS = 45_000;
