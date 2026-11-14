@@ -294,6 +294,28 @@ interface CitySceneProps {
   onSelect: (b: CityBuilding | null) => void;
 }
 
+// Sky, stars and moon ride with the camera.
+//
+// They used to sit at the world origin, which worked while the camera stayed
+// inside the dome — but this city's radius is ~1400 and the default camera sits
+// ~2300 out, so the star shell (r = 2400) was barely behind the viewer and read
+// as a dome hanging over the town. Panning could also take the camera outside
+// it entirely. Anchoring the dome to the camera removes the parallax: the stars
+// stay put relative to the viewer, which is exactly how an infinitely distant
+// sky behaves.
+function SkyDome() {
+  const { camera } = useThree();
+  const group = useRef<THREE.Group>(null);
+  useFrame(() => {
+    group.current?.position.copy(camera.position);
+  });
+  return (
+    <group ref={group}>
+      <SkyDome />
+    </group>
+  );
+}
+
 export default function CityScene({
   layout,
   selected,
