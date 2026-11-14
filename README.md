@@ -32,7 +32,7 @@ npm run dev          # http://localhost:3210
 
 | 文件 | 是什么 | 谁更新 |
 | --- | --- | --- |
-| `data/blogs-original.csv` | 上游名单的副本：名称、网址、RSS、标签 | `npm run sync` 从 GitHub 拉：CI 用 raw.github（无缓存），本地优先 jsDelivr（raw 在国内常被墙） |
+| `data/blogs-original.csv` | 上游名单的副本（MIT）：名称、网址、RSS、标签 | `npm run sync` 从 GitHub 拉：CI 用 raw.github（无缓存），本地优先 jsDelivr（raw 在国内常被墙） |
 | `data/health.json` | 每篇博客最近发文时间、是否失效、失败原因 | `npm run sync` 拉 `indi.blog/api/blogs.json` |
 
 `src/data/blogs.json` 是两者的合并结果（博客数量随名单变化，代码里不写死）：
@@ -107,8 +107,8 @@ fresh = 1 / (1 + 距上次发文的天数 / 90)
 | 有 RSS 但抓不到发文时间（刚建站、只有 sitemap） | 0.5 | 未知不该等于「很新」 |
 
 数据来自列表自己的公开状态接口 `https://indi.blog/api/blogs.json`（每小时由它的 Worker 重新检测、
-响应缓存 1 小时）。它的 Worker 已经处理了所有 RSS 的坑 —— 证书错误、sitemap、缺失时区、被当成构建时间的
-`updated`、域名复活 —— 判定阈值是：明确错误（SSL、不是 feed、404/410/530）持续 1 天、其它错误持续 7 天
+响应缓存 1 小时）。它的 Worker 已经处理了所有 RSS 的坑：证书错误、sitemap、缺失时区、被当成构建时间的
+`updated`、域名复活。判定阈值是：明确错误（SSL、不是 feed、404/410/530）持续 1 天、其它错误持续 7 天
 判为疑似失效，满 90 天为已失效。我们只做一次字段映射：
 
 ```
@@ -118,8 +118,8 @@ error                → reason
 ```
 
 `scripts/sync-health.mjs` 拉一次接口（1 个请求，约 1 秒）写成 `data/health.json`，每天 09:43（北京时间）
-由 GitHub Actions 执行（`.github/workflows/sync-health.yml`）。快照没有实质变化时不提交、不重新部署 ——
-因为 `fresh` 是构建时用「当前时间 − lastPostAt」算的，快照放旧几天也不会失真。
+由 GitHub Actions 执行（`.github/workflows/sync-health.yml`）。快照没有实质变化时不提交、不重新部署，
+因为 `fresh` 是构建时用「快照时间 − lastPostAt」算的，快照放旧几天也不会失真。
 
 ### 楼
 
@@ -145,7 +145,7 @@ score   = 0.20 · fresh^0.9 + 0.80 · pct^1.2
 
 **为什么楼高要掺一个 `pct`。** 这份名单是两极的：一成的博客这周发过文，一半已经一年多没动静。
 如果楼高直接跟着 `fresh` 走，活跃的那批会全部挤在顶部、沉默的那批全部挤在底部，而且相邻名次的楼
-高度几乎一样 —— 远看就是「高的差不多高、矮的都很接近」，中间还有重叠（一个三个月没写的楼可能比
+高度几乎一样。远看就是「高的差不多高、矮的都很接近」，中间还有重叠（一个三个月没写的楼可能比
 昨天刚发的还高）。
 
 先排名、再用 `^1.2` 拉开，每个活跃度区间各占一段天际线，区间之间不重叠：
@@ -177,7 +177,7 @@ score   = 0.20 · fresh^0.9 + 0.80 · pct^1.2
 
 ### 市中心
 
-中间是一片半径 96 的圆盘：外圈是环形车道，里面是绿岛，岛上是石台和一座雕塑 ——
+中间是一片半径 96 的圆盘：外圈是环形车道，里面是绿岛，岛上是石台和一座雕塑：
 **就是 BLOG CITY 这八个字母本身**，用 helvetiker bold 字样挤出 3.4 的厚度，高 21，立在石台上。
 
 单一朝向（朝向默认机位），不是四面环绕的牌子：走过去一个字一个字读，背面就是反面。
@@ -209,7 +209,7 @@ score   = 0.20 · fresh^0.9 + 0.80 · pct^1.2
 | `R` | 随机看一间 |
 
 平移有边界：`homeFor()` 按城市实际范围算出 `bound = reach × 1.12`，每帧把 `controls.target`
-夹在 ±bound 内，并把相机平移相同的量 —— 撞到边界时画面停住，视角方向不变。
+夹在 ±bound 内，并把相机平移相同的量。撞到边界时画面停住，视角方向不变。
 OrbitControls 本身没有平移限制，这是补在它之后的一层。
 
 地面是一块纯黑的圆盘（半径 26000，远超相机 12000 的远裁剪面），所以永远看不到它的边，
@@ -217,7 +217,7 @@ OrbitControls 本身没有平移限制，这是补在它之后的一层。
 
 空闲时城市会自己慢慢转（`autoRotateSpeed = 0.15`），你一动它就永久停下。
 点大厦的飞行是一段 1.4 秒的缓出插值（`progress += delta × 0.7`，`1 - (1-p)³`），
-机位从「背离城中心」的一侧看向楼的正面 —— 这也是 git-city 的做法。
+机位从「背离城中心」的一侧看向楼的正面。这也是 git-city 的做法。
 
 ## 部署
 
@@ -238,8 +238,6 @@ Build output:      dist
 - 构建命令收在 `package.json` 的 `build:ci` 里（`node scripts/build-blogs.mjs && vite build`，纯本地、不联网），面板里只有一句，改逻辑改仓库即可，不会出现「面板和仓库不一致」；
 - Node 版本由仓库里的 `.node-version` 文件指定（`22`），Pages 的构建镜像会读它。
 
-保存后得到 `https://blog-city.pages.dev`；绑上自定义域名后正式地址是 **https://play.mukunjin.com**。
-
 ### 之后
 
 ```bash
@@ -250,7 +248,7 @@ Pages 监听 push → 构建 → 上线，构建失败会发邮件。分支推�
 
 ```
 main   → https://play.mukunjin.com                 （生产）
-分支 X → https://x.blog-city.pages.dev            （预览，不影响生产）
+分支 X → https://x.blog-city.pages.dev             （预览，不影响生产）
 ```
 
 改版式时开个分支推上去看效果，满意再合。回滚：项目 → Deployments → 选任意一次历史部署 → **Rollback**。
@@ -260,18 +258,6 @@ main   → https://play.mukunjin.com                 （生产）
 见上面的 [数据更新工作流](#数据更新工作流)：每天 09:43 自动同步，有变化才提交，提交才触发构建。
 
 想改成每周或每小时，改 `.github/workflows/sync-health.yml` 里那行 `cron` 即可（构建额度 500 次/月，现在用不到 5%）。
-
-### 可选的加固
-
-**① Deploy Hook（防 webhook 丢投递）**
-
-Pages 项目 → Settings → Builds & deployments → Deploy hooks → Add，复制 URL，存到 GitHub 仓库 secret：
-
-```
-名称：CF_DEPLOY_HOOK
-```
-
-`sync-health.yml` 里已经有这一步：提交之后，如果这个 secret 存在就额外 POST 一次触发构建；不存在就跳过。不配也能用，页面更新依赖 webhook。
 
 ### 手动部署（一般用不上）
 
@@ -292,18 +278,19 @@ npm run deploy    # = build + wrangler pages deploy dist --project-name blog-cit
 ## 代码结构
 
 ```
-shared/blogs.mjs        CSV + README 解析、快照构建（Node 与浏览器通用）
-scripts/build-blogs.mjs 生成 src/data/blogs.json
-src/lib/metrics.ts      楼的视觉编码（高度 / 亮窗 / 占地）
-src/lib/layout.ts       城市平面：方格路网 → 中心向外分配地块 → 落楼
+shared/blogs.mjs        CSV 解析、去重、统计与快照构建（零依赖）
+scripts/sync-health.mjs 拉上游 CSV 与状态接口，写 data/
+scripts/build-blogs.mjs 读 data/ 生成 src/data/blogs.json
+src/lib/metrics.ts      楼的视觉编码（高度 / 亮窗）
+src/lib/layout.ts       城市平面：放射路网、拒绝采样落位
 src/scene/Buildings.tsx 全城一次 draw call 的实例化楼体，窗户由 shader 程序化绘制
-src/scene/Backdrop.tsx  天空、星空、月亮、统一色的地面与环城路
+src/scene/Backdrop.tsx  天空、星空、月亮、地面
 src/ui/                 HUD、搜索目录、博客详情
-wrangler.jsonc          Workers 静态资源配置
+data/                   上游名单与状态快照的本地副本
 ```
 
 ## 数据与致谢
 
-- 名单来自 [timqian/chinese-independent-blogs](https://github.com/timqian/chinese-independent-blogs)（ISC）。
-- 3D 城市的玩法参考了 [srizzon/git-city](https://github.com/srizzon/git-city)（AGPL-3.0）——本项目代码为独立实现，未复制其源码。
+- 名单来自 [timqian/chinese-independent-blogs](https://github.com/timqian/chinese-independent-blogs)，MIT License。
+- 3D 城市的玩法参考了 [srizzon/git-city](https://github.com/srizzon/git-city)（AGPL-3.0）；本项目代码为独立实现，未复制其源码。
 - 楼体、天空、地面均为自制 shader，无第三方美术资源。
