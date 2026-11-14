@@ -37,13 +37,14 @@ function homeFor(layout: CityLayout): Home {
     Math.abs(layout.extent.minZ),
     layout.extent.maxZ,
   );
-  // 1.15: the frame opens on downtown and the first ring, with the suburbs
-  // running off the edges — closer than a full-city establishing shot, which
-  // read as "looking at a map" rather than "arriving in a city". Pull-back is
-  // 1.7x this, so the whole thing is still one scroll away.
-  const d = Math.max(280, reach * 1.15);
+  // 1.02: the frame opens inside the first ring, suburbs well off screen.
+  // The camera also sits lower (0.44 instead of 0.60 of the radius), so the
+  // towers are seen nearly side-on with the skyline against the sky rather than
+  // from above like a plan. Polar angle stays ~24° above the horizon, still
+  // inside the controller's tilt limit.
+  const d = Math.max(280, reach * 1.02);
   return {
-    pos: new THREE.Vector3(d * 0.56, d * 0.6, d * 0.8),
+    pos: new THREE.Vector3(d * 0.58, d * 0.44, d * 0.82),
     target: new THREE.Vector3(0, 16, 0),
     distance: d,
     reach,
