@@ -37,9 +37,11 @@ function homeFor(layout: CityLayout): Home {
     Math.abs(layout.extent.minZ),
     layout.extent.maxZ,
   );
-  // 1.35: downtown fills the frame on load, the outer ring sits just inside the
-  // edges. Pull-back is still 1.45x this, so the whole city stays reachable.
-  const d = Math.max(280, reach * 1.35);
+  // 1.15: the frame opens on downtown and the first ring, with the suburbs
+  // running off the edges — closer than a full-city establishing shot, which
+  // read as "looking at a map" rather than "arriving in a city". Pull-back is
+  // 1.7x this, so the whole thing is still one scroll away.
+  const d = Math.max(280, reach * 1.15);
   return {
     pos: new THREE.Vector3(d * 0.56, d * 0.6, d * 0.8),
     target: new THREE.Vector3(0, 16, 0),
@@ -55,7 +57,7 @@ function homeFor(layout: CityLayout): Home {
 // flying to a tower. Panning, orbiting and zooming all write that pivot, so the
 // view is never locked to the middle of the city.
 const TWEEN_RATE = 0.7; // builds the same 1.4s flight as the reference
-const ZOOM_MAX_FACTOR = 1.45; // how far out you may pull from the default view
+const ZOOM_MAX_FACTOR = 1.7; // how far out you may pull from the default view
 const MAX_TILT = Math.PI / 2.1;
 const AUTO_ROTATE_SPEED = 0.15;
 
