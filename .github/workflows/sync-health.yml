@@ -1,14 +1,16 @@
 name: sync-health
 
-# Daily, 02:17 UTC = 10:17 in Beijing. Off the hour on purpose: GitHub's
-# scheduler queues hard at :00 and can run 20+ minutes late.
+# Daily, 01:43 UTC = 09:43 in Beijing. Deliberately not on the hour: GitHub's
+# scheduler queues hardest at :00 of every hour (and worst around 00:00 UTC),
+# where a run can start 20-30 minutes late or be dropped. :43 with an odd hour
+# lands in a quiet slot; the job itself takes about a minute.
 #
 # Daily rather than weekly because a static build freezes whatever it saw: a
 # weekly sync left the tower count up to seven days behind the list, which read
 # as "the numbers are wrong".
 on:
   schedule:
-    - cron: "17 2 * * *"
+    - cron: "43 1 * * *"
   # Also run when this pipeline itself changes, so the first deploy already has
   # data and a fix gets exercised immediately. Data commits below do not match
   # these paths, so there is no loop.

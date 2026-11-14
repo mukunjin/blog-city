@@ -212,7 +212,7 @@ main   → https://play.mukunjin.com                 （生产）
 
 ### 数据怎么更新
 
-`.github/workflows/sync-health.yml`，每天 10:17（北京时间）：
+`.github/workflows/sync-health.yml`，每天 09:43（北京时间）：
 
 ```
 拉一次状态接口

@@ -210,11 +210,6 @@ code {
   gap: 8px;
 }
 
-.brand-asof {
-  margin-left: 10px;
-  color: rgba(143, 158, 194, 0.7);
-}
-
 .btn.is-on {
   border-color: rgba(255, 212, 121, 0.45);
   color: #ffe6b8;
@@ -855,9 +850,6 @@ kbd {
   }
   .help-pop {
     width: min(296px, calc(100vw - 28px));
-  }
-  .brand-asof {
-    display: none;
   }
   .hint,
   .credit {

@@ -37,9 +37,9 @@ function homeFor(layout: CityLayout): Home {
     Math.abs(layout.extent.minZ),
     layout.extent.maxZ,
   );
-  // 1.62 instead of 2.05: the skyline now fills the frame on load instead of
-  // floating in the middle of it, and there is still room to pull back (1.45x)
-  const d = Math.max(320, reach * 1.62);
+  // 1.35: downtown fills the frame on load, the outer ring sits just inside the
+  // edges. Pull-back is still 1.45x this, so the whole city stays reachable.
+  const d = Math.max(280, reach * 1.35);
   return {
     pos: new THREE.Vector3(d * 0.56, d * 0.6, d * 0.8),
     target: new THREE.Vector3(0, 16, 0),

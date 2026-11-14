@@ -3,22 +3,13 @@ import type { CatalogStats } from "../../shared/blogs";
 
 interface HudProps {
   stats: CatalogStats;
-  /** when the snapshot behind these numbers was taken */
-  snapshot?: string;
   onDirectory: () => void;
   onRandom: () => void;
 }
 
 const fmt = (n: number) => n.toLocaleString("en-US");
 
-// 2026-11-14T10:12:50.000Z -> 11-14
-function day(iso?: string) {
-  const m = iso ? /^(\d{4})-(\d{2})-(\d{2})/.exec(iso) : null;
-  return m ? `${m[2]}-${m[3]}` : "";
-}
-
-export default function Hud({ stats, snapshot, onDirectory, onRandom }: HudProps) {
-  const asof = day(snapshot);
+export default function Hud({ stats, onDirectory, onRandom }: HudProps) {
   const [helpOpen, setHelpOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
 
@@ -49,7 +40,6 @@ export default function Hud({ stats, snapshot, onDirectory, onRandom }: HudProps
         <p className="brand-meta">
           <strong>{fmt(stats.total)}</strong> 座大厦 · <strong>{fmt(stats.alive)}</strong> 仍在更新 ·{" "}
           <strong>{fmt(stats.dead)}</strong> 座疑似失效
-          {asof && <span className="brand-asof">数据 {asof}</span>}
         </p>
       </header>
 
