@@ -57,6 +57,35 @@ npm run data     # 只重算：data/ 的 CSV + health → src/data/blogs.json（
 - **每天**：它的 Actions 把结果渲染进 README 并提交；
 - **每天**：我们拉一次它的公开状态接口和名单 CSV。
 
+## 数据更新工作流
+
+每天 **09:43（北京时间）** 自动跑一次，定义在 `.github/workflows/sync-health.yml`。
+
+```
+拉上游 CSV（jsDelivr → raw.github）   → data/blogs-original.csv
+拉状态接口（1 个请求）               → data/health.json
+重算城市快照                         → src/data/blogs.json
+                ↓
+        三个文件有变化吗？
+        没有 → 结束（不提交、不构建、不部署）
+        有   → 提交 → Pages 看到 push → 构建 → 上线
+```
+
+| 什么时候跑 | 触发方式 | 结果 |
+| --- | --- | --- |
+| 每天 09:43 | 定时 | 有变化才提交，一天最多部署一次 |
+| 改了 `scripts/sync-health.mjs` 或这个工作流 | push | 立即跑一次，验证改动 |
+| 想立刻更新 | Actions → sync-health → Run workflow | 同上 |
+
+本地等价操作：
+
+```bash
+npm run sync    # 拉 CSV + 状态接口，再重算（走网络）
+npm run data    # 只重算，零网络
+```
+
+失败时什么都不写、退出码非 0：站点继续用仓库里上一次的数据，不会挂。
+
 ## 计算公式
 
 所有数值都在生成数据时算好写进 JSON，前端不再随机；刷新页面、换设备，城市长得一模一样。
@@ -216,15 +245,9 @@ main   → https://play.mukunjin.com                 （生产）
 
 ### 数据怎么更新
 
-`.github/workflows/sync-health.yml`，每天 09:43（北京时间）：
+见上面的 [数据更新工作流](#数据更新工作流)：每天 09:43 自动同步，有变化才提交，提交才触发构建。
 
-```
-拉一次状态接口
- ├─ 快照没变 → 直接结束，不提交、不构建
- └─ 快照变了 → commit & push → Pages 自动重建 → 上线
-```
-
-想改成每周或每小时，改那行 `cron`（构建次数上限 500 次/月，现在用不到 5%）。
+想改成每周或每小时，改 `.github/workflows/sync-health.yml` 里那行 `cron` 即可（构建额度 500 次/月，现在用不到 5%）。
 
 ### 可选的加固
 
