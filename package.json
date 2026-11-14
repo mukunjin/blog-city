@@ -28,5 +28,6 @@
     "typescript": "^5.9.0",
     "vite": "^7.1.0",
     "wrangler": "^4.153.0"
-  }
+  },
+  "license": "GPL-3.0"
 }
