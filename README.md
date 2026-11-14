@@ -324,7 +324,7 @@ scripts/sync-health.mjs 拉上游 CSV 与状态接口，写 data/
 scripts/build-blogs.mjs 读 data/ 生成 src/data/blogs.json
 src/lib/metrics.ts      楼的视觉编码（高度 / 亮窗）
 src/lib/layout.ts       城市平面：放射路网、拒绝采样落位
-src/scene/Buildings.tsx 全城一次 draw call 的实例化楼体，窗户由 shader 程序化绘制
+src/scene/Buildings.tsx 全部楼体一次 draw call，窗户由 shader 程序化绘制
 src/scene/Backdrop.tsx  天空、星空、月亮、地面
 src/ui/                 HUD、搜索目录、博客详情
 data/                   上游名单与状态快照的本地副本
