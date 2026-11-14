@@ -38,8 +38,8 @@ jobs:
           node-version: 22
 
       # Pulls the csv mirror and the status api into data/, then rebuilds the
-      # committed snapshot. Both steps are offline-safe: if the network is down
-      # the run fails here and the committed files stay untouched.
+      # committed snapshot. If either fetch fails the run stops here, before
+      # anything is written: the previous snapshot keeps serving the site.
       - name: Pull the csv and the status api
         run: node scripts/sync-health.mjs
 
@@ -61,7 +61,7 @@ jobs:
           git config user.name "blog-city-bot"
           git config user.email "blog-city-bot@users.noreply.github.com"
           git add data/blogs-original.csv data/health.json src/data/blogs.json
-          git commit -m "chore(data): sync blog health"
+          git commit -m "chore(data): sync the list and the status"
           git push
 
       # Push already triggers Cloudflare Pages by webhook. This is a belt-and-
