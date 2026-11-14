@@ -65,15 +65,15 @@ export default function Hud({ stats, onDirectory, onRandom }: HudProps) {
               <dl className="help-rows">
                 <div>
                   <dt>左键拖动</dt>
-                  <dd>旋转、俯仰</dd>
+                  <dd>平移城市，范围锁在城区内</dd>
                 </div>
                 <div>
                   <dt>右键拖动</dt>
-                  <dd>平移，旋转中心跟着走</dd>
+                  <dd>绕当前位置旋转、俯仰</dd>
                 </div>
                 <div>
                   <dt>滚轮</dt>
-                  <dd>缩放</dd>
+                  <dd>缩放，朝鼠标位置推近</dd>
                 </div>
                 <div>
                   <dt>点大厦</dt>
@@ -120,7 +120,7 @@ export default function Hud({ stats, onDirectory, onRandom }: HudProps) {
       </div>
 
       <p className="hint">
-        拖动旋转 · 滚轮缩放 · 点击大厦 · <kbd>R</kbd> 随机 · <kbd>Esc</kbd> 关闭
+        左键平移 · 右键旋转 · 滚轮缩放 · 点击大厦 · <kbd>R</kbd> 随机
       </p>
     </>
   );

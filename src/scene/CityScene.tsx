@@ -200,10 +200,18 @@ function Rig({ focus, homeToken, home }: { focus: FocusTarget | null; homeToken:
       maxPolarAngle={MAX_TILT}
       autoRotate
       autoRotateSpeed={AUTO_ROTATE_SPEED}
-      // plain OrbitControls bindings: left drag orbits, right drag pans, wheel
-      // zooms. The map-style remap (left = pan, zoom to cursor) never felt
-      // right here, so it is gone along with its key handler.
+      // Map bindings, the ones every map app trained the hand to expect:
+      // left drag slides the city, right drag orbits and tilts, wheel zooms
+      // toward the pointer. Panning stays in the ground plane, so a drag never
+      // lifts the camera off the map the way free panning would.
+      mouseButtons={{
+        LEFT: THREE.MOUSE.PAN,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: THREE.MOUSE.ROTATE,
+      }}
+      touches={{ ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE }}
       screenSpacePanning={false}
+      zoomToCursor
       onStart={() => {
         // grabbing the city mid-flight takes over instantly
         userMoved.current = true;
