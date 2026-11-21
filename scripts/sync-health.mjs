@@ -52,6 +52,12 @@ const TIMEOUT_MS = 45_000;
 // their own renderer treats a short payload as a broken deployment, and so do we
 const MIN_BLOGS = 1000;
 const MIN_CSV_ROWS = 1000;
+// A valid response can still be dangerous: a renamed field or a broken upstream
+// worker can silently erase dates or mark most of the city dead. These are
+// deliberately large, single-day change limits, not forecasts of normal churn.
+const MAX_COUNT_DROP = 0.05;
+const MAX_DATED_DROP = 0.05;
+const MAX_DEAD_CHANGE = 0.05;
 
 /** ISO string → unix seconds, or null. */
 function toUnix(iso) {
@@ -59,9 +65,50 @@ function toUnix(iso) {
   return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
 }
 
+function validateTimestamp(value, label) {
+  if (value == null) return;
+  if (typeof value !== 'string' || !Number.isFinite(Date.parse(value))) {
+    throw new Error(`${label} is not a valid ISO date`);
+  }
+}
+
+/** Reject a changed or malformed API contract instead of translating it into facts. */
+export function validateStatusPayload(data) {
+  if (!Array.isArray(data?.blogs)) throw new Error('missing blogs array in the response');
+  const blogs = data.blogs;
+  if (blogs.length < MIN_BLOGS) throw new Error(`only ${blogs.length} blogs in the response`);
+
+  blogs.forEach((b, index) => {
+    const label = `blogs[${index}]`;
+    if (!b || typeof b !== 'object' || Array.isArray(b)) throw new Error(`${label} is not an object`);
+    if (typeof b.url !== 'string') throw new Error(`${label}.url is missing`);
+    let url;
+    try {
+      url = new URL(b.url);
+    } catch {
+      throw new Error(`${label}.url is invalid`);
+    }
+    if (!['http:', 'https:'].includes(url.protocol) || !blogId(b.url)) {
+      throw new Error(`${label}.url is not an http(s) blog URL`);
+    }
+    if (typeof b.feed !== 'string') throw new Error(`${label}.feed is missing or not a string`);
+    if (b.error != null && typeof b.error !== 'string') throw new Error(`${label}.error is not a string`);
+    if (typeof b.dead !== 'boolean') throw new Error(`${label}.dead is missing or not a boolean`);
+    if (b.lastPost != null && (typeof b.lastPost !== 'object' || Array.isArray(b.lastPost))) {
+      throw new Error(`${label}.lastPost is not an object`);
+    }
+    if (b.lastPost != null && b.lastPost.publishedAt == null) {
+      throw new Error(`${label}.lastPost.publishedAt is missing`);
+    }
+    validateTimestamp(b.lastPost?.publishedAt, `${label}.lastPost.publishedAt`);
+    validateTimestamp(b.failingSince, `${label}.failingSince`);
+  });
+  return blogs;
+}
+
 async function fetchStatus() {
   // The endpoint sits behind Cloudflare and is occasionally slow to answer from
-  // a home connection; one request, three tries, then give up cleanly.
+  // a home connection; one request, three tries, then wait for the next cron.
   let last;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
@@ -70,10 +117,7 @@ async function fetchStatus() {
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const blogs = Array.isArray(data?.blogs) ? data.blogs : [];
-      if (blogs.length < MIN_BLOGS) throw new Error(`only ${blogs.length} blogs in the response`);
-      return blogs;
+      return validateStatusPayload(await res.json());
     } catch (err) {
       last = err;
       if (attempt < 3) {
@@ -116,37 +160,48 @@ async function readText(file) {
 
 async function readPrevious() {
   try {
-    return JSON.parse(await readFile(healthFile, 'utf8')).blogs ?? {};
-  } catch {
-    return {};
+    const blogs = JSON.parse(await readFile(healthFile, 'utf8')).blogs;
+    if (!blogs || typeof blogs !== 'object' || Array.isArray(blogs)) {
+      throw new Error('missing blogs object');
+    }
+    return blogs;
+  } catch (err) {
+    if (err.code === 'ENOENT') return {};
+    throw new Error(`previous health snapshot is unreadable: ${err.message}`);
   }
 }
 
-async function main() {
-  const now = Math.floor(Date.now() / 1000);
-  const [list, previous, csv, currentCsv] = await Promise.all([
-    fetchStatus(),
-    readPrevious(),
-    fetchCsv(),
-    readText(csvFile),
-  ]);
+function validateHealthChange(previous, blogs, reportedDated) {
+  const before = Object.values(previous);
+  if (before.length < MIN_BLOGS) return; // first usable snapshot
+  const after = Object.values(blogs);
+  const pct = (n) => (n * 100).toFixed(1);
 
-  // ---- the list first: it changes far less often than the statuses ----
-  const csvChanged = csv.text !== currentCsv;
-  if (csvChanged) {
-    await mkdir(path.dirname(csvFile), { recursive: true });
-    await writeFile(csvFile, csv.text, 'utf8');
-    const before = currentCsv ? currentCsv.split('\n').filter((l) => l.trim()).length - 1 : 0;
-    const sign = before ? (csv.rows >= before ? '+' : '') + (csv.rows - before) : 'new';
-    console.log(`✓ ${csv.rows} rows from ${csv.label} → data/blogs-original.csv (${sign} vs before)`);
-  } else {
-    console.log(`= ${csv.rows} rows unchanged — data/blogs-original.csv left as is`);
+  if (after.length < before.length * (1 - MAX_COUNT_DROP)) {
+    throw new Error(`tracked blogs fell from ${before.length} to ${after.length}; manual review required`);
   }
 
-  // ---- then the per-blog status ----
+  const datedBefore = before.filter((b) => b?.lastPostAt).length;
+  // Check what the API actually reported, before last-known dates are carried
+  // forward. Otherwise renaming lastPost.publishedAt could look valid forever.
+  if (datedBefore >= 100 && reportedDated < datedBefore * (1 - MAX_DATED_DROP)) {
+    throw new Error(`API-reported dates fell from ${datedBefore} to ${reportedDated}; manual review required`);
+  }
+
+  const deadBefore = before.filter((b) => b?.deadSince).length;
+  const deadAfter = after.filter((b) => b?.deadSince).length;
+  const deadChange = Math.abs(deadAfter - deadBefore) / before.length;
+  if (deadChange > MAX_DEAD_CHANGE) {
+    throw new Error(`dead blogs changed by ${pct(deadChange)}% in one sync; manual review required`);
+  }
+}
+
+/** Translate and validate everything before main() is allowed to write a file. */
+export function buildHealthSnapshot(list, previous, now) {
   const blogs = {};
   let dated = 0;
   let dead = 0;
+  let reportedDated = 0;
 
   for (const b of list) {
     const id = blogId(b.url || '');
@@ -154,6 +209,7 @@ async function main() {
     const prev = previous[id] ?? {};
 
     const at = toUnix(b.lastPost?.publishedAt);
+    if (at) reportedDated++;
     // a blog we already dated keeps its date when the API has none today
     const lastPostAt = at ?? prev.lastPostAt ?? null;
     if (lastPostAt) dated++;
@@ -171,6 +227,37 @@ async function main() {
     };
   }
 
+  validateHealthChange(previous, blogs, reportedDated);
+  return { blogs, dated, dead };
+}
+
+async function main() {
+  const now = Math.floor(Date.now() / 1000);
+  const [list, previous, csv, currentCsv] = await Promise.all([
+    fetchStatus(),
+    readPrevious(),
+    fetchCsv(),
+    readText(csvFile),
+  ]);
+
+  // Nothing is written until both fetches and every health-data check pass.
+  // In particular, a healthy-looking CSV must not be committed alongside a
+  // missing, changed, or suspect status response.
+  const { blogs, dated, dead } = buildHealthSnapshot(list, previous, now);
+
+  // ---- the list first: it changes far less often than the statuses ----
+  const csvChanged = csv.text !== currentCsv;
+  if (csvChanged) {
+    await mkdir(path.dirname(csvFile), { recursive: true });
+    await writeFile(csvFile, csv.text, 'utf8');
+    const before = currentCsv ? currentCsv.split('\n').filter((l) => l.trim()).length - 1 : 0;
+    const sign = before ? (csv.rows >= before ? '+' : '') + (csv.rows - before) : 'new';
+    console.log(`✓ ${csv.rows} rows from ${csv.label} → data/blogs-original.csv (${sign} vs before)`);
+  } else {
+    console.log(`= ${csv.rows} rows unchanged — data/blogs-original.csv left as is`);
+  }
+
+  // ---- then the per-blog status ----
   // Freshness is computed at build time from lastPostAt, so an unchanged
   // snapshot stays correct for as long as it exists. Only rewrite the file when
   // a fact actually changed.
@@ -216,8 +303,11 @@ async function main() {
   console.log(`  dated ${dated} · dead ${dead} · median age ${median} days · newest ${ages[0]?.toFixed(1) ?? '–'} days`);
 }
 
-main().catch((err) => {
-  console.error(`✗ sync failed: ${err.message}`);
-  console.error('  nothing was written; the build keeps using the committed csv and snapshot');
-  process.exit(1);
-});
+const invokedAsScript = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (invokedAsScript) {
+  main().catch((err) => {
+    console.error(`✗ sync failed: ${err.message}`);
+    console.error('  no commit or deployment will run; the last committed csv and snapshot stay live');
+    process.exit(1);
+  });
+}

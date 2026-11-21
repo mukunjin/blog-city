@@ -22,19 +22,21 @@ const healthFile = path.join(root, 'data', 'health.json');
 const out = path.join(root, 'src', 'data', 'blogs.json');
 
 async function loadHealth() {
+  let parsed;
   try {
-    const parsed = JSON.parse(await readFile(healthFile, 'utf8'));
-    if (!parsed?.blogs || !Object.keys(parsed.blogs).length) {
-      return { health: undefined, count: 0, at: undefined };
-    }
-    return {
-      health: parsed.blogs,
-      count: Object.keys(parsed.blogs).length,
-      at: Date.parse(parsed.updatedAt ?? '') || undefined,
-    };
-  } catch {
-    return { health: undefined, count: 0, at: undefined };
+    parsed = JSON.parse(await readFile(healthFile, 'utf8'));
+  } catch (err) {
+    throw new Error(`${path.relative(root, healthFile)} is missing or invalid: ${err.message}`);
   }
+  if (!parsed?.blogs || typeof parsed.blogs !== 'object' || Array.isArray(parsed.blogs)) {
+    throw new Error(`${path.relative(root, healthFile)} has no blogs object`);
+  }
+  if (!Object.keys(parsed.blogs).length) {
+    throw new Error(`${path.relative(root, healthFile)} has an empty blogs object`);
+  }
+  const at = Date.parse(parsed.updatedAt ?? '');
+  if (!Number.isFinite(at)) throw new Error(`${path.relative(root, healthFile)} has an invalid updatedAt`);
+  return { health: parsed.blogs, count: Object.keys(parsed.blogs).length, at };
 }
 
 let csvText;
@@ -45,7 +47,15 @@ try {
   process.exit(1);
 }
 
-const { health, count: healthCount, at: snapshotAt } = await loadHealth();
+let snapshot;
+try {
+  snapshot = await loadHealth();
+} catch (err) {
+  console.error(`✗ ${err.message}`);
+  console.error('  refusing to rebuild or deploy without the last valid health snapshot');
+  process.exit(1);
+}
+const { health, count: healthCount, at: snapshotAt } = snapshot;
 const catalog = buildCatalog({
   csvText,
   health,
@@ -82,12 +92,6 @@ const mark = unchanged ? '=' : '✓';
 const tail = unchanged ? '— unchanged, file left as it is' : `→ ${path.relative(root, out)} (${kb} kB)`;
 console.log(`${mark} ${catalog.blogs.length} blogs from data/blogs-original.csv ${tail}`);
 console.log(`  dead: ${catalog.stats.dead} · alive: ${catalog.stats.alive} · tagged: ${catalog.stats.tagged}`);
-console.log(
-  `  health: ${
-    healthCount
-      ? `${healthCount} blogs with real dates from data/health.json`
-      : 'none — every tower falls back to the default freshness'
-  }`,
-);
+console.log(`  health: ${healthCount} blogs from the committed data/health.json snapshot`);
 const freshest = catalog.blogs.filter((b) => !b.dead).sort((a, b) => b.fresh - a.fresh)[0];
 if (freshest) console.log(`  latest post: ${freshest.name}`);

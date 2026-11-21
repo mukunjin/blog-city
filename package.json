@@ -5,6 +5,7 @@
   "type": "module",
   "description": "中文独立博客列表，变成一座 3D 像素城市",
   "scripts": {
+    "test": "node --test scripts/*.test.mjs",
     "data": "node scripts/build-blogs.mjs",
     "dev": "vite --port 3210",
     "build": "vite build",
