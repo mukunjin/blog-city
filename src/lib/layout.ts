@@ -10,7 +10,8 @@ import type { CityBuilding, CityLayout, CityRoad, CityTree } from "./types";
 // writing always ends up downtown and the quiet ones drift to the edge.
 
 const GAP = 15; // minimum air between two towers
-const MAX_ATTEMPTS = 96;
+const MAX_ATTEMPTS = 180;
+const FALLBACK_ATTEMPTS = 512;
 const HASH = 18;
 
 const SPOKES = 8;
@@ -48,7 +49,7 @@ export function buildCity(blogs: Blog[]): CityLayout {
 
   // footprints up front, so the city radius can be budgeted before placement
   const feet = specs.map((s) => {
-    const size = 9.4 + s.breadth * 4.6 + rand01(s.seed ^ 0x2f) * 2.2;
+    const size = 11.4 + s.breadth * 5.8 + rand01(s.seed ^ 0x2f) * 2.6;
     return { w: size, d: size * (0.9 + rand01(s.seed ^ 0x1b3f) * 0.22) };
   });
 
@@ -80,13 +81,18 @@ export function buildCity(blogs: Blog[]): CityLayout {
     return false;
   };
 
+  // Buckets store tower centres. A wide neighbour's centre can sit farther away
+  // than this candidate's own half-width plus GAP, so search by the widest
+  // possible half-footprint too.
+  const maxHalfFootprint = feet.reduce((max, f) => Math.max(max, f.w, f.d), 0) / 2;
   const buckets = new Map<string, Rect[]>();
   const key = (gx: number, gz: number) => `${gx},${gz}`;
   const hits = (r: Rect): boolean => {
-    const x0 = Math.floor((r.x - r.w / 2 - GAP) / HASH);
-    const x1 = Math.floor((r.x + r.w / 2 + GAP) / HASH);
-    const z0 = Math.floor((r.z - r.d / 2 - GAP) / HASH);
-    const z1 = Math.floor((r.z + r.d / 2 + GAP) / HASH);
+    const pad = GAP + maxHalfFootprint;
+    const x0 = Math.floor((r.x - r.w / 2 - pad) / HASH);
+    const x1 = Math.floor((r.x + r.w / 2 + pad) / HASH);
+    const z0 = Math.floor((r.z - r.d / 2 - pad) / HASH);
+    const z1 = Math.floor((r.z + r.d / 2 + pad) / HASH);
     for (let gx = x0; gx <= x1; gx++) {
       for (let gz = z0; gz <= z1; gz++) {
         const list = buckets.get(key(gx, gz));
@@ -98,6 +104,11 @@ export function buildCity(blogs: Blog[]): CityLayout {
   };
 
   const buildings: CityBuilding[] = [];
+  // A candidate is valid only if it clears roads, the plaza and every existing tower.
+  const blocked = (candidate: Rect): boolean =>
+    onRoad(candidate.x, candidate.z, ROAD_PAD + Math.max(candidate.w, candidate.d) * 0.5) ||
+    Math.hypot(candidate.x, candidate.z) < PLAZA + 26 + Math.max(candidate.w, candidate.d) * 0.5 ||
+    hits(candidate);
 
   for (let i = 0; i < n; i++) {
     const blog = members[i];
@@ -120,20 +131,30 @@ export function buildCity(blogs: Blog[]): CityLayout {
         w: foot.w,
         d: foot.d,
       };
-      // a building may not sit on a road, and needs the pad around it
-      if (onRoad(candidate.x, candidate.z, ROAD_PAD + Math.max(candidate.w, candidate.d) * 0.5)) continue;
-      // the roundabout owns the middle of town
-      if (Math.hypot(candidate.x, candidate.z) < PLAZA + 26 + Math.max(candidate.w, candidate.d) * 0.5) continue;
-      if (hits(candidate)) continue;
+      if (blocked(candidate)) continue;
       placed = candidate;
       break;
     }
 
+    // The old fallback could drop a tower without checking collisions. Search
+    // outwards instead, and fail the layout rather than ever overlap two towers.
     if (!placed) {
-      const angle = rand01(spec.seed) * Math.PI * 2;
-      const r = radius * (1.22 + rand01(spec.seed ^ 5) * 0.2);
-      placed = { x: Math.cos(angle) * r, z: Math.sin(angle) * r, w: foot.w, d: foot.d };
+      for (let attempt = 0; attempt < FALLBACK_ATTEMPTS; attempt++) {
+        const angle = rand01(spec.seed + attempt * 104729) * Math.PI * 2;
+        const r = radius * (1.02 + (attempt / FALLBACK_ATTEMPTS) * 0.4);
+        const candidate: Rect = {
+          x: Math.cos(angle) * r,
+          z: Math.sin(angle) * r,
+          w: foot.w,
+          d: foot.d,
+        };
+        if (blocked(candidate)) continue;
+        placed = candidate;
+        break;
+      }
     }
+
+    if (!placed) throw new Error(`could not place ${blog.id} without overlapping another tower`);
 
     const box = placed;
     const k = key(Math.floor(box.x / HASH), Math.floor(box.z / HASH));
@@ -206,6 +227,8 @@ function plantTrees(
   const trees: CityTree[] = [];
   const grid = new Map<string, { x: number; z: number }[]>();
   const gkey = (x: number, z: number) => `${Math.floor(x / TREE_HASH)},${Math.floor(z / TREE_HASH)}`;
+  // Wide towers can reach buckets several cells away from the tree's own cell.
+  const buildingReach = buildings.reduce((max, b) => Math.max(max, b.w, b.d), 0) / 2 + 3;
 
   const clear = (x: number, z: number): boolean => {
     // too close to another tree?
@@ -219,10 +242,10 @@ function plantTrees(
       }
     }
     // inside a tower?
-    const bx0 = Math.floor((x - 8) / HASH);
-    const bx1 = Math.floor((x + 8) / HASH);
-    const bz0 = Math.floor((z - 8) / HASH);
-    const bz1 = Math.floor((z + 8) / HASH);
+    const bx0 = Math.floor((x - buildingReach) / HASH);
+    const bx1 = Math.floor((x + buildingReach) / HASH);
+    const bz0 = Math.floor((z - buildingReach) / HASH);
+    const bz1 = Math.floor((z + buildingReach) / HASH);
     for (let a = bx0; a <= bx1; a++) {
       for (let b = bz0; b <= bz1; b++) {
         const list = buildingBuckets.get(`${a},${b}`);
