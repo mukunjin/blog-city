@@ -110,6 +110,8 @@ export default function App() {
         <BlogPanel building={selected} onClose={() => select(null)} onRandom={random} />
 
         <footer className="credit">
+          源码：<a href="https://github.com/mukunjin/blog-city" target="_blank" rel="noreferrer noopener">mukunjin/blog-city</a>
+          {" · "}
           数据：<a href="https://github.com/timqian/chinese-independent-blogs" target="_blank" rel="noreferrer noopener">中文独立博客列表</a>
           {" · "}
           {catalog.stats.total.toLocaleString("en-US")} 个博客
