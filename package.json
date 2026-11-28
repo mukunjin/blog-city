@@ -6,10 +6,11 @@
   "description": "中文独立博客列表，变成一座 3D 像素城市",
   "scripts": {
     "test": "node --test scripts/*.test.mjs",
+    "typecheck": "tsc --noEmit",
     "data": "node scripts/build-blogs.mjs",
     "dev": "vite --port 3210",
     "build": "vite build",
-    "build:ci": "node scripts/build-blogs.mjs && vite build",
+    "build:ci": "tsc --noEmit && node scripts/build-blogs.mjs && vite build",
     "preview": "vite preview --port 3210",
     "deploy": "npm run build:ci && wrangler pages deploy dist --project-name blog-city --branch main --commit-dirty=true",
     "sync": "node scripts/sync-health.mjs && node scripts/build-blogs.mjs"
