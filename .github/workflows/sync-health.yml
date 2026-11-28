@@ -32,6 +32,9 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    # a stalled fetch or a hung install should not hold a runner for the six-hour
+    # default; the job normally finishes in about two minutes
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -99,7 +102,12 @@ jobs:
             echo "no hook configured — the push webhook is the only trigger"
             exit 0
           fi
-          curl -fsS -X POST "$CF_DEPLOY_HOOK" > /dev/null
+          # The push already kicked Pages by webhook. A hook that does not answer
+          # is a fallback failing, not a sync failing — the data is published by
+          # this point, and turning that into a red run would file an issue
+          # claiming the city is a day behind when it is not.
+          curl -fsS -X POST "$CF_DEPLOY_HOOK" > /dev/null ||
+            echo "::warning::the Pages deploy hook did not answer"
 
       # A daily job that fails quietly looks exactly like a daily job that found
       # nothing new — and the city quietly ages in the meantime, because `fresh`
