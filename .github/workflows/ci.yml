@@ -1,0 +1,40 @@
+name: ci
+
+# The daily sync job guards the data path — fetch, validate, build, push. This
+# one guards the code path: the layout, the shaders and the UI change in a
+# hand-written commit, and until this workflow existed nothing ran on one.
+# Pages still refuses to publish a broken build, but the commit would already
+# be sitting on main.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Test the layout and the data pipeline
+        run: npm test
+
+      # The same command Pages runs, so a green tick here means the deploy will
+      # at least get as far as producing a bundle.
+      - name: Typecheck and build
+        run: npm run build:ci
