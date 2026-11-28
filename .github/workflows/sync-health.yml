@@ -36,7 +36,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .node-version
 
       - name: Test the sync guards
         run: npm test
@@ -71,9 +71,17 @@ jobs:
 
       # Push already triggers Cloudflare Pages by webhook. This is a belt-and-
       # braces trigger in case a delivery gets dropped; skipped when the secret
-      # is not configured.
+      # is not configured. The empty check lives in the shell rather than in the
+      # `if:` because a step's own `env:` is not guaranteed to be in the `env`
+      # context by the time its `if:` is evaluated — the guard would have read
+      # an empty string and skipped the trigger on every run.
       - name: Trigger the Pages build
-        if: steps.commit.outputs.pushed == 'true' && env.CF_DEPLOY_HOOK != ''
+        if: steps.commit.outputs.pushed == 'true'
         env:
           CF_DEPLOY_HOOK: ${{ secrets.CF_DEPLOY_HOOK }}
-        run: curl -fsS -X POST "$CF_DEPLOY_HOOK" > /dev/null
+        run: |
+          if [ -z "$CF_DEPLOY_HOOK" ]; then
+            echo "no hook configured — the push webhook is the only trigger"
+            exit 0
+          fi
+          curl -fsS -X POST "$CF_DEPLOY_HOOK" > /dev/null
