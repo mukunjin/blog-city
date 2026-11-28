@@ -32,6 +32,17 @@ const MAX_HEIGHT = 214;
 const MIN_HEIGHT = 14;
 
 /**
+ * One knob for how big a tower is, applied to the footprint *and* the height so
+ * a building keeps its proportions instead of turning into a squat block.
+ *
+ * At 1 the avenue was 12 units wide and the median block 15: a tower read as
+ * thinner than the road in front of it. Widening the footprint on its own would
+ * have made the city look like a field of bungalows, hence the shared factor —
+ * the skyline grows with the blocks.
+ */
+export const TOWER_SCALE = 1.6;
+
+/**
  * Height is a ladder, not a straight line in age.
  *
  * The list is bimodal: about a tenth of the blogs posted this week while half
@@ -66,7 +77,7 @@ export function buildingMetrics(blog: Blog, pct = blog.fresh): BuildingMetrics {
 
   if (blog.dead) {
     return {
-      height: 9 + jitter * 13,
+      height: (9 + jitter * 13) * TOWER_SCALE,
       lit: 0.015 + jitter * 0.02,
       breadth,
       seed,
@@ -77,7 +88,7 @@ export function buildingMetrics(blog: Blog, pct = blog.fresh): BuildingMetrics {
   // real time since the last post), 80% rank does the visual spreading.
   const score = 0.2 * Math.pow(fresh, 0.9) + 0.8 * rankScore(pct);
   return {
-    height: MIN_HEIGHT + (MAX_HEIGHT - MIN_HEIGHT) * score,
+    height: (MIN_HEIGHT + (MAX_HEIGHT - MIN_HEIGHT) * score) * TOWER_SCALE,
     lit: 0.08 + 0.8 * Math.pow(fresh, 0.75),
     breadth,
     seed,

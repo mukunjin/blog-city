@@ -1,5 +1,5 @@
 import type { Blog } from "../../shared/blogs";
-import { buildingMetrics, rand01 } from "./metrics";
+import { TOWER_SCALE, buildingMetrics, rand01 } from "./metrics";
 import type { CityBuilding, CityLayout, CityRoad, CityTree } from "./types";
 
 // ─── City plan ─────────────────────────────────────────────────
@@ -18,6 +18,9 @@ const SPOKES = 8;
 const SPOKE_WIDTH = 12;
 const RING_WIDTH = 9.5;
 const RING_FRACS = [0.34, 0.62, 0.88];
+// share of the city disc taken by the tower lots (footprint + GAP). Tuned
+// against TOWER_SCALE so the blocks fill the grid instead of stretching it.
+const DENSITY = 0.35;
 // a tower keeps this much distance from the asphalt edge
 const ROAD_PAD = 4.2;
 const SPOKE_OFFSET = 0.14; // avenues are rotated slightly off the axes
@@ -49,14 +52,17 @@ export function buildCity(blogs: Blog[]): CityLayout {
 
   // footprints up front, so the city radius can be budgeted before placement
   const feet = specs.map((s) => {
-    const size = 11.4 + s.breadth * 5.8 + rand01(s.seed ^ 0x2f) * 2.6;
+    const size = (11.4 + s.breadth * 5.8 + rand01(s.seed ^ 0x2f) * 2.6) * TOWER_SCALE;
     return { w: size, d: size * (0.9 + rand01(s.seed ^ 0x1b3f) * 0.22) };
   });
 
-  // area budget → radius; the packing factor stays low on purpose, the city
-  // should read as scattered towers with air between them
+  // area budget → radius. DENSITY sets how much of the disc the tower lots
+  // claim, i.e. it sizes the street grid, not the buildings: widening a tower
+  // without raising this would just push the whole city outwards, and the
+  // camera follows the city, so every block would end up exactly as small on
+  // screen as before.
   const area = feet.reduce((sum, f) => sum + (f.w + GAP) * (f.d + GAP), 0);
-  const radius = Math.max(60, Math.sqrt(area / (Math.PI * 0.205)));
+  const radius = Math.max(60, Math.sqrt(area / (Math.PI * DENSITY)));
 
   // ── road plan ──
   const rings = RING_FRACS.map((f) => radius * f);

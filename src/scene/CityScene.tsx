@@ -141,7 +141,7 @@ function Rig({ focus, homeToken, home }: { focus: FocusTarget | null; homeToken:
 
     // Stand outside the tower, on the side facing away from downtown, and look
     // back at its face. Distance follows the tower's height, since ours range
-    // from a 9-unit dead blog to a 214-unit landmark.
+    // from a 14-unit dead blog to a 342-unit landmark.
     const k = Math.min(1.9, Math.max(0.62, focus.h / 110));
     const isMobile = window.innerWidth < 640;
     const dist = (isMobile ? 300 : 180) * k;
