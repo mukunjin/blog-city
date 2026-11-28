@@ -17,7 +17,12 @@ const HASH = 18;
 const SPOKES = 8;
 const SPOKE_WIDTH = 12;
 const RING_WIDTH = 9.5;
-const RING_FRACS = [0.34, 0.62, 0.88];
+// Ring roads are a fixed distance apart, not a fraction of the radius: a longer
+// list then earns another ring instead of pushing the ones already there
+// outwards, and the blocks between two rings stay the size they were.
+const RING_SPACING = 260;
+// the outermost ring stops short of the edge, leaving a sparse fringe behind it
+const RING_FILL = 0.92;
 // share of the city disc taken by the tower lots (footprint + GAP). Tuned
 // against TOWER_SCALE so the blocks fill the grid instead of stretching it.
 const DENSITY = 0.35;
@@ -143,7 +148,8 @@ interface Plan {
 
 function planCity(members: Blog[], specs: BuildingMetrics[], feet: Footprint[], radius: number): Plan | null {
   const n = members.length;
-  const rings = RING_FRACS.map((f) => radius * f);
+  const ringCount = Math.floor((radius * RING_FILL) / RING_SPACING);
+  const rings = Array.from({ length: ringCount }, (_, i) => (i + 1) * RING_SPACING);
   const reach = radius * 1.16;
   const spokeBase = SPOKE_OFFSET;
   const lane = SPOKE_WIDTH / 2;
