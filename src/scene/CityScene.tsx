@@ -37,14 +37,15 @@ function homeFor(layout: CityLayout): Home {
     Math.abs(layout.extent.minZ),
     layout.extent.maxZ,
   );
-  // 1.02: the frame opens inside the first ring, suburbs well off screen.
-  // The camera also sits lower (0.44 instead of 0.60 of the radius), so the
-  // towers are seen nearly side-on with the skyline against the sky rather than
-  // from above like a plan. Polar angle stays ~24° above the horizon, still
-  // inside the controller's tilt limit.
+  // 1.02 sizes the disc the controller may pull back to; the opening shot sits
+  // inside it. The camera also sits low (0.44 of that distance instead of 0.60),
+  // so the towers are seen nearly side-on with the skyline against the sky
+  // rather than from above like a plan. Polar angle stays ~24° above the
+  // horizon, still inside the controller's tilt limit.
   const d = Math.max(280, reach * 1.02);
+  const start = d * OPEN_DISTANCE;
   return {
-    pos: new THREE.Vector3(d * 0.58, d * 0.44, d * 0.82),
+    pos: new THREE.Vector3(start * 0.58, start * 0.44, start * 0.82),
     target: new THREE.Vector3(0, 16, 0),
     distance: d,
     reach,
@@ -61,6 +62,11 @@ const TWEEN_RATE = 0.7; // builds the same 1.4s flight as the reference
 const ZOOM_MAX_FACTOR = 1.7; // how far out you may pull from the default view
 const MAX_TILT = Math.PI / 2.1;
 const AUTO_ROTATE_SPEED = 0.15;
+// Where the opening shot sits, as a share of the disc the controls may pull back
+// to. It used to open at 1.02 — just outside the last tower — which framed the
+// whole town as a field of specks. 0.8 starts inside the outer ring: the
+// skyline fills the frame, and the wide view is one wheel-spin away.
+const OPEN_DISTANCE = 0.8;
 
 interface Flight {
   active: boolean;
