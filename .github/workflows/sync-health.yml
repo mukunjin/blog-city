@@ -23,6 +23,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: sync-health
@@ -42,9 +43,6 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Test the sync guards
-        run: npm test
-
       # Pulls the csv mirror and the status api into data/, then rebuilds the
       # committed snapshot. If either fetch or any health-data validation fails,
       # the run stops before anything is written or committed. There is no
@@ -54,6 +52,12 @@ jobs:
 
       - name: Rebuild the city data
         run: node scripts/build-blogs.mjs
+
+      # Runs after the rebuild so the layout is measured against the new
+      # snapshot, not yesterday's: a list that grew past what the disc holds, or
+      # a spike in dead blogs, shows up here rather than in the deployed picture.
+      - name: Test the layout and the sync guards
+        run: npm test
 
       # Everything above can pass while the site itself no longer compiles —
       # a field the layout reads could go missing, and the deploy would break
@@ -96,3 +100,22 @@ jobs:
             exit 0
           fi
           curl -fsS -X POST "$CF_DEPLOY_HOOK" > /dev/null
+
+      # A daily job that fails quietly looks exactly like a daily job that found
+      # nothing new — and the city quietly ages in the meantime, because `fresh`
+      # is computed from the snapshot time. Leave a mark where somebody looks:
+      # one issue, reused through comments, so a bad week is not seven titles.
+      - name: Report a failed sync
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          existing=$(gh issue list --state open --limit 1 \
+            --search "sync-health failed in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Failed again: $RUN_URL"
+          else
+            gh issue create --title "sync-health failed" \
+              --body "The daily sync stopped before it could publish, so the city is still serving the last good snapshot. Run: $RUN_URL"
+          fi
