@@ -3,9 +3,10 @@ import * as THREE from "three";
 import type { CityLayout } from "../lib/types";
 
 // ─── Streets ───────────────────────────────────────────────────
-// The road plan is radial: eight avenues out of downtown, three ring roads
-// around it. Everything is instanced — the whole network is two draw calls
-// (asphalt + lane markings) plus one per ring.
+// The road plan is radial: eight avenues out of downtown, plus a ring road
+// every 260 units of radius (see `RING_SPACING`), so a bigger city gets more
+// rings rather than wider gaps between them. Everything is instanced — the
+// whole network is two draw calls (asphalt + lane markings) plus one per ring.
 
 const ASPHALT = "#161c28";
 const LANE = "#3a3524";

@@ -24,8 +24,10 @@ const RING_SPACING = 260;
 // the outermost ring stops short of the edge, leaving a sparse fringe behind it
 const RING_FILL = 0.92;
 // share of the city disc taken by the tower lots (footprint + GAP). Tuned
-// against TOWER_SCALE so the blocks fill the grid instead of stretching it.
-const DENSITY = 0.35;
+// against TOWER_SCALE so the blocks fill the grid instead of stretching it,
+// and then lowered again: the city was too tightly packed to read as a city,
+// and the room it bought is what pays for one more ring road.
+const DENSITY = 0.24;
 // a tower keeps this much distance from the asphalt edge
 const ROAD_PAD = 4.2;
 const SPOKE_OFFSET = 0.14; // avenues are rotated slightly off the axes
@@ -361,7 +363,10 @@ function plantTrees(
   for (const r of rings) {
     const rIn = r - (RING_WIDTH / 2 + 3.6);
     const rOut = r + (RING_WIDTH / 2 + 3.6);
-    const steps = Math.round((Math.PI * 2 * r) / 26);
+    // A ring now appears every 260 units, so keeping the old 26-unit step would
+    // have doubled the tree count along with the ring count. 34 still reads as
+    // a planted avenue, and the budget stays where it was.
+    const steps = Math.round((Math.PI * 2 * r) / 34);
     for (let i = 0; i < steps; i++) {
       const a = (i / steps) * Math.PI * 2 + 0.13;
       add(Math.cos(a) * rIn, Math.sin(a) * rIn);
