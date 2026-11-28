@@ -13,6 +13,9 @@ import type { CityBuilding, CityLayout, CityRoad, CityTree } from "./types";
 const GAP = 15; // minimum air between two towers
 const MAX_ATTEMPTS = 180;
 const HASH = 18;
+// 137.5 degrees: each rank lands a third of a turn from the previous one, which
+// is the classic even spread on a disc (Vogel spiral) — see the placement loop.
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 const SPOKES = 8;
 const SPOKE_WIDTH = 12;
@@ -28,7 +31,7 @@ const RING_FILL = 0.92;
 // against TOWER_SCALE so the blocks fill the grid instead of stretching it.
 // Lowering it is how the city is made to breathe: the radius grows, and with a
 // fixed ring spacing that shows up as more rings, not wider gaps.
-const DENSITY = 0.35;
+const DENSITY = 0.24;
 // a tower keeps this much distance from the asphalt edge
 const ROAD_PAD = 4.2;
 const SPOKE_OFFSET = 0.14; // avenues are rotated slightly off the axes
@@ -203,6 +206,9 @@ function planCity(members: Blog[], specs: BuildingMetrics[], feet: Footprint[], 
     Math.hypot(candidate.x, candidate.z) < PLAZA + 26 + Math.max(candidate.w, candidate.d) * 0.5 ||
     hits(candidate);
 
+  // mean distance between two towers on this disc, i.e. the room one tower has
+  const spacing = Math.sqrt((Math.PI * radius * radius) / n);
+
   for (let i = 0; i < n; i++) {
     const blog = members[i];
     const spec = specs[i];
@@ -218,8 +224,17 @@ function planCity(members: Blog[], specs: BuildingMetrics[], feet: Footprint[], 
       // after a while, let the tower slip outwards instead of giving up
       if (attempt > MAX_ATTEMPTS * 0.55) pushed += 0.03;
       const ring = Math.max(near, radius * Math.min(1.3, even + pushed));
-      const angle = rand01(spec.seed + attempt * 7919) * Math.PI * 2;
-      const wobble = 1 + (rand01(spec.seed ^ attempt) - 0.5) * 0.14;
+      // Ranks sit on nearly the same radius, so a uniform random angle stacked
+      // them into clumps of two or three with a neighbour one wall away, and
+      // left voids between. The golden angle puts successive ranks a third of
+      // a turn apart, and a quarter-spacing of jitter keeps the result from
+      // reading as a machine-cut spiral.
+      const slot = Math.min(0.4, spacing / Math.max(ring, 1));
+      const angle =
+        i * GOLDEN_ANGLE +
+        (rand01(spec.seed + attempt * 7919) - 0.5) * slot * 0.5 +
+        attempt * GOLDEN_ANGLE * 0.5;
+      const wobble = 1 + (rand01(spec.seed ^ attempt) - 0.5) * 0.06;
       const candidate: Rect = {
         x: Math.cos(angle) * ring * wobble,
         z: Math.sin(angle) * ring * wobble,
