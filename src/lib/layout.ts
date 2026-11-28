@@ -17,17 +17,18 @@ const HASH = 18;
 const SPOKES = 8;
 const SPOKE_WIDTH = 12;
 const RING_WIDTH = 9.5;
-// Ring roads are a fixed distance apart, not a fraction of the radius: a longer
-// list then earns another ring instead of pushing the ones already there
-// outwards, and the blocks between two rings stay the size they were.
-const RING_SPACING = 260;
+// Ring roads sit a fixed distance apart, so growth buys another ring instead of
+// pushing the existing ones outwards and opening the blocks up. 460 is the gap
+// the current three-ring city has: pin it here once, and from now on the count
+// follows the radius while the distance stays put.
+const RING_SPACING = 460;
 // the outermost ring stops short of the edge, leaving a sparse fringe behind it
 const RING_FILL = 0.92;
 // share of the city disc taken by the tower lots (footprint + GAP). Tuned
-// against TOWER_SCALE so the blocks fill the grid instead of stretching it,
-// and then lowered again: the city was too tightly packed to read as a city,
-// and the room it bought is what pays for one more ring road.
-const DENSITY = 0.24;
+// against TOWER_SCALE so the blocks fill the grid instead of stretching it.
+// Lowering it is how the city is made to breathe: the radius grows, and with a
+// fixed ring spacing that shows up as more rings, not wider gaps.
+const DENSITY = 0.35;
 // a tower keeps this much distance from the asphalt edge
 const ROAD_PAD = 4.2;
 const SPOKE_OFFSET = 0.14; // avenues are rotated slightly off the axes
@@ -363,10 +364,9 @@ function plantTrees(
   for (const r of rings) {
     const rIn = r - (RING_WIDTH / 2 + 3.6);
     const rOut = r + (RING_WIDTH / 2 + 3.6);
-    // A ring now appears every 260 units, so keeping the old 26-unit step would
-    // have doubled the tree count along with the ring count. 34 still reads as
-    // a planted avenue, and the budget stays where it was.
-    const steps = Math.round((Math.PI * 2 * r) / 34);
+    // one tree every 26 units; the ring count follows the radius, so a bigger
+    // city just gets more of these lines at the same rhythm
+    const steps = Math.round((Math.PI * 2 * r) / 26);
     for (let i = 0; i < steps; i++) {
       const a = (i / steps) * Math.PI * 2 + 0.13;
       add(Math.cos(a) * rIn, Math.sin(a) * rIn);

@@ -4,7 +4,7 @@ import type { CityLayout } from "../lib/types";
 
 // ─── Streets ───────────────────────────────────────────────────
 // The road plan is radial: eight avenues out of downtown, plus a ring road
-// every 260 units of radius (see `RING_SPACING`), so a bigger city gets more
+// every 460 units of radius (see `RING_SPACING`), so a bigger city gets more
 // rings rather than wider gaps between them. Everything is instanced — the
 // whole network is two draw calls (asphalt + lane markings) plus one per ring.
 
