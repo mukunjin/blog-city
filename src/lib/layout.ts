@@ -1,5 +1,6 @@
 import type { Blog } from "../../shared/blogs";
 import { TOWER_SCALE, buildingMetrics, rand01 } from "./metrics";
+import type { BuildingMetrics } from "./metrics";
 import type { CityBuilding, CityLayout, CityRoad, CityTree } from "./types";
 
 // ─── City plan ─────────────────────────────────────────────────
@@ -11,7 +12,6 @@ import type { CityBuilding, CityLayout, CityRoad, CityTree } from "./types";
 
 const GAP = 15; // minimum air between two towers
 const MAX_ATTEMPTS = 180;
-const FALLBACK_ATTEMPTS = 512;
 const HASH = 18;
 
 const SPOKES = 8;
@@ -27,12 +27,23 @@ const SPOKE_OFFSET = 0.14; // avenues are rotated slightly off the axes
 // downtown is kept clear: a roundabout with the city's sign in the middle
 export const PLAZA = 96;
 
+// A city still needs its downtown: under this radius there is no ring left to
+// build on, only the roundabout's keep-out. Matters once the list is small.
+const MIN_RADIUS = PLAZA + 60;
+// Multipliers tried in turn when a plan does not fit. One step is 12% more
+// radius, i.e. ~20% less density per lot, so a step or two is normally enough;
+// the cap keeps a broken input from growing forever.
+const RADIUS_STEPS = [1, 1.12, 1.26, 1.42, 1.6, 1.8, 2];
+
 interface Rect {
   x: number;
   z: number;
   w: number;
   d: number;
 }
+
+type Footprint = { w: number; d: number };
+type RoadTest = (x: number, z: number, pad: number) => boolean;
 
 function overlaps(a: Rect, b: Rect, gap: number): boolean {
   return Math.abs(a.x - b.x) * 2 < a.w + b.w + gap * 2 && Math.abs(a.z - b.z) * 2 < a.d + b.d + gap * 2;
@@ -62,9 +73,76 @@ export function buildCity(blogs: Blog[]): CityLayout {
   // camera follows the city, so every block would end up exactly as small on
   // screen as before.
   const area = feet.reduce((sum, f) => sum + (f.w + GAP) * (f.d + GAP), 0);
-  const radius = Math.max(60, Math.sqrt(area / (Math.PI * DENSITY)));
+  const budget = Math.sqrt(area / (Math.PI * DENSITY));
 
-  // ── road plan ──
+  // The plan is drawn on a disc and the disc grows until every tower fits, so
+  // tomorrow's blogs widen the city instead of failing the layout or doubling
+  // up in a lot. The steps are fixed factors, so the same list still draws the
+  // same city.
+  let plan: Plan | null = null;
+  let radius = 0;
+  for (const grow of RADIUS_STEPS) {
+    radius = Math.max(MIN_RADIUS, budget * grow);
+    plan = planCity(members, specs, feet, radius);
+    if (plan) break;
+  }
+  if (!plan) throw new Error(`no room for ${n} towers on a disc of radius ${Math.round(radius)}`);
+
+  const { rings, reach, buildings, buckets, onRoad } = plan;
+  const spokeBase = SPOKE_OFFSET;
+  const lane = SPOKE_WIDTH / 2;
+
+  // Dev-only guard. The plan promises that no two towers share ground; if this
+  // ever fires it is a bug in the sampler, not in the data, and it should be
+  // loud here rather than visible as two buildings fused together.
+  if (import.meta.env?.DEV) assertNoOverlap(buildings);
+
+  // ── roads, for rendering ──
+  const roads: CityRoad[] = [];
+  for (let s = 0; s < SPOKES; s++) {
+    roads.push({
+      kind: "spoke",
+      at: spokeBase + (s * Math.PI * 2) / SPOKES,
+      width: SPOKE_WIDTH,
+      from: PLAZA - 4,
+      to: reach,
+    });
+  }
+  for (const r of rings) roads.push({ kind: "ring", at: r, width: RING_WIDTH, from: r, to: r });
+
+  // ── trees: street trees first, then whatever fits in the empty lots ──
+  const trees = plantTrees(radius, reach, rings, spokeBase, lane, buildings, buckets, onRoad);
+
+  let minX = 0;
+  let maxX = 0;
+  let minZ = 0;
+  let maxZ = 0;
+  for (const b of buildings) {
+    minX = Math.min(minX, b.x - b.w / 2);
+    maxX = Math.max(maxX, b.x + b.w / 2);
+    minZ = Math.min(minZ, b.z - b.d / 2);
+    maxZ = Math.max(maxZ, b.z + b.d / 2);
+  }
+
+  return { buildings, roads, trees, plaza: PLAZA, extent: { minX, maxX, minZ, maxZ } };
+}
+
+// ─── One attempt at the plan ───────────────────────────────────
+// Everything about a city that depends on its radius: the ring roads, the
+// avenues, and where every tower stands. Returns null the moment a tower cannot
+// be placed clear of the roads, the roundabout and its neighbours — the caller
+// then retries on a bigger disc.
+
+interface Plan {
+  rings: number[];
+  reach: number;
+  buildings: CityBuilding[];
+  buckets: Map<string, Rect[]>;
+  onRoad: RoadTest;
+}
+
+function planCity(members: Blog[], specs: BuildingMetrics[], feet: Footprint[], radius: number): Plan | null {
+  const n = members.length;
   const rings = RING_FRACS.map((f) => radius * f);
   const reach = radius * 1.16;
   const spokeBase = SPOKE_OFFSET;
@@ -80,7 +158,7 @@ export function buildCity(blogs: Blog[]): CityLayout {
     return Math.abs(Math.sin(off)) * d;
   };
 
-  const onRoad = (x: number, z: number, pad: number): boolean => {
+  const onRoad: RoadTest = (x, z, pad) => {
     const d = Math.hypot(x, z);
     if (d <= reach && spokeDist(x, z) < lane + pad) return true;
     for (const r of rings) if (Math.abs(d - r) < RING_WIDTH / 2 + pad) return true;
@@ -121,6 +199,8 @@ export function buildCity(blogs: Blog[]): CityLayout {
     const spec = specs[i];
     const foot = feet[i];
     const even = Math.sqrt((i + 0.6) / n); // even coverage, centre first
+    // downtown keeps its air, so the innermost ring starts past the roundabout
+    const near = PLAZA + 26 + Math.max(foot.w, foot.d) / 2;
 
     let placed: Rect | null = null;
     let pushed = 0;
@@ -128,7 +208,7 @@ export function buildCity(blogs: Blog[]): CityLayout {
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       // after a while, let the tower slip outwards instead of giving up
       if (attempt > MAX_ATTEMPTS * 0.55) pushed += 0.03;
-      const ring = radius * Math.min(1.3, even + pushed);
+      const ring = Math.max(near, radius * Math.min(1.3, even + pushed));
       const angle = rand01(spec.seed + attempt * 7919) * Math.PI * 2;
       const wobble = 1 + (rand01(spec.seed ^ attempt) - 0.5) * 0.14;
       const candidate: Rect = {
@@ -142,25 +222,9 @@ export function buildCity(blogs: Blog[]): CityLayout {
       break;
     }
 
-    // The old fallback could drop a tower without checking collisions. Search
-    // outwards instead, and fail the layout rather than ever overlap two towers.
-    if (!placed) {
-      for (let attempt = 0; attempt < FALLBACK_ATTEMPTS; attempt++) {
-        const angle = rand01(spec.seed + attempt * 104729) * Math.PI * 2;
-        const r = radius * (1.02 + (attempt / FALLBACK_ATTEMPTS) * 0.4);
-        const candidate: Rect = {
-          x: Math.cos(angle) * r,
-          z: Math.sin(angle) * r,
-          w: foot.w,
-          d: foot.d,
-        };
-        if (blocked(candidate)) continue;
-        placed = candidate;
-        break;
-      }
-    }
-
-    if (!placed) throw new Error(`could not place ${blog.id} without overlapping another tower`);
+    // No spot for this one at this radius: hand the whole disc back so the
+    // caller can spread it out. Never place first and hope it fits.
+    if (!placed) return null;
 
     const box = placed;
     const k = key(Math.floor(box.x / HASH), Math.floor(box.z / HASH));
@@ -183,34 +247,18 @@ export function buildCity(blogs: Blog[]): CityLayout {
     });
   }
 
-  // ── roads, for rendering ──
-  const roads: CityRoad[] = [];
-  for (let s = 0; s < SPOKES; s++) {
-    roads.push({
-      kind: "spoke",
-      at: spokeBase + (s * Math.PI * 2) / SPOKES,
-      width: SPOKE_WIDTH,
-      from: PLAZA - 4,
-      to: reach,
-    });
+  return { rings, reach, buildings, buckets, onRoad };
+}
+
+/** Every pair shares no ground. O(n²), and only ever called in dev. */
+function assertNoOverlap(buildings: CityBuilding[]): void {
+  for (let i = 0; i < buildings.length; i++) {
+    for (let j = i + 1; j < buildings.length; j++) {
+      const a = buildings[i];
+      const b = buildings[j];
+      if (overlaps(a, b, 0)) throw new Error(`towers ${a.blog.id} and ${b.blog.id} overlap`);
+    }
   }
-  for (const r of rings) roads.push({ kind: "ring", at: r, width: RING_WIDTH, from: r, to: r });
-
-  // ── trees: street trees first, then whatever fits in the empty lots ──
-  const trees = plantTrees(radius, reach, rings, spokeBase, lane, buildings, buckets, onRoad);
-
-  let minX = 0;
-  let maxX = 0;
-  let minZ = 0;
-  let maxZ = 0;
-  for (const b of buildings) {
-    minX = Math.min(minX, b.x - b.w / 2);
-    maxX = Math.max(maxX, b.x + b.w / 2);
-    minZ = Math.min(minZ, b.z - b.d / 2);
-    maxZ = Math.max(maxZ, b.z + b.d / 2);
-  }
-
-  return { buildings, roads, trees, plaza: PLAZA, extent: { minX, maxX, minZ, maxZ } };
 }
 
 // ─── Trees ─────────────────────────────────────────────────────
