@@ -294,6 +294,8 @@ function assertNoOverlap(buildings: CityBuilding[]): void {
 
 const TREE_MIN_DIST = 19;
 const TREE_HASH = 9;
+// air between a trunk and a facade, so a crown never grows into the wall
+const TREE_CLEAR = 4;
 
 function plantTrees(
   radius: number,
@@ -308,21 +310,25 @@ function plantTrees(
   const trees: CityTree[] = [];
   const grid = new Map<string, { x: number; z: number }[]>();
   const gkey = (x: number, z: number) => `${Math.floor(x / TREE_HASH)},${Math.floor(z / TREE_HASH)}`;
+  // A cell is 9 units but two trees may stand 19 apart, so the neighbourhood has
+  // to be searched out to the minimum distance — one cell each way only covered
+  // 18 units and quietly let trees crowd to 17.
+  const span = Math.ceil(TREE_MIN_DIST / TREE_HASH);
   // Wide towers can reach buckets several cells away from the tree's own cell.
-  const buildingReach = buildings.reduce((max, b) => Math.max(max, b.w, b.d), 0) / 2 + 3;
+  const buildingReach = buildings.reduce((max, b) => Math.max(max, b.w, b.d), 0) / 2 + TREE_CLEAR;
 
   const clear = (x: number, z: number): boolean => {
     // too close to another tree?
     const gx = Math.floor(x / TREE_HASH);
     const gz = Math.floor(z / TREE_HASH);
-    for (let a = gx - 1; a <= gx + 1; a++) {
-      for (let b = gz - 1; b <= gz + 1; b++) {
+    for (let a = gx - span; a <= gx + span; a++) {
+      for (let b = gz - span; b <= gz + span; b++) {
         const list = grid.get(`${a},${b}`);
         if (!list) continue;
         for (const t of list) if (Math.hypot(t.x - x, t.z - z) < TREE_MIN_DIST) return false;
       }
     }
-    // inside a tower?
+    // inside a tower, or close enough for the crown to brush the facade?
     const bx0 = Math.floor((x - buildingReach) / HASH);
     const bx1 = Math.floor((x + buildingReach) / HASH);
     const bz0 = Math.floor((z - buildingReach) / HASH);
@@ -332,7 +338,9 @@ function plantTrees(
         const list = buildingBuckets.get(`${a},${b}`);
         if (!list) continue;
         for (const r of list) {
-          if (Math.abs(r.x - x) * 2 < r.w + 3 && Math.abs(r.z - z) * 2 < r.d + 3) return false;
+          // the old test compared 2·distance against width + 3, which left the
+          // tree 1.5 units off the wall — inside its own crown
+          if (Math.abs(r.x - x) < r.w / 2 + TREE_CLEAR && Math.abs(r.z - z) < r.d / 2 + TREE_CLEAR) return false;
         }
       }
     }
