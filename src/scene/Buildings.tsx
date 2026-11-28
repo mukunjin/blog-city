@@ -46,6 +46,7 @@ const fragmentShader = /* glsl */ `
   uniform float uFogNear;
   uniform float uFogFar;
   uniform float uTime;
+  uniform float uPaneInset;
 
   varying vec3 vTint;
   varying vec2 vWin;
@@ -80,7 +81,9 @@ const fragmentShader = /* glsl */ `
     vec2 cell = floor(g);
     vec2 f = fract(g);
 
-    float pane = step(0.22, f.x) * step(f.x, 0.78) * step(0.24, f.y) * step(f.y, 0.8);
+    // one pane per cell, inset by uPaneInset on all four sides: the wall left
+    // between two panes is what makes the grid read as windows at a distance
+    float pane = step(uPaneInset, f.x) * step(f.x, 1.0 - uPaneInset) * step(uPaneInset, f.y) * step(f.y, 1.0 - uPaneInset);
     float r = hash21(cell, vSeed * 53.0 + 7.0);
     float lit = step(r, vLit) * pane;
     float flicker = 0.9 + 0.1 * sin(uTime * 1.6 + r * 63.0);
@@ -101,7 +104,12 @@ const fragmentShader = /* glsl */ `
   }
 `;
 
-const FLOOR_HEIGHT = 3.2;
+// floor-to-floor, in world units. Matched to the 4.2-unit window column in
+// `layout.ts`, so a pane comes out roughly square instead of a tall slot.
+const FLOOR_HEIGHT = 4.2;
+// how much of each cell is wall: 0.14 leaves a pane that is 72% of the cell,
+// the same ratio git-city's window atlas uses (6px pane in an 8px cell)
+const PANE_INSET = 0.14;
 
 interface BuildingsProps {
   layout: CityLayout;
@@ -157,6 +165,7 @@ export default function Buildings({ layout, onHover, onSelect, fog }: BuildingsP
           uFogNear: { value: fog.near },
           uFogFar: { value: fog.far },
           uTime: { value: 0 },
+          uPaneInset: { value: PANE_INSET },
         },
       }),
     [fog.color, fog.near, fog.far],

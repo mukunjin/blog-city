@@ -250,7 +250,9 @@ function planCity(members: Blog[], specs: BuildingMetrics[], feet: Footprint[], 
       d: box.d,
       h: spec.height,
       lit: spec.lit,
-      cols: Math.max(2, Math.round(box.w / 2.7)),
+      // one window column every 4.2 units: fewer, chunkier panes than the old
+      // 2.7, which read as a fine grid of dots from the default camera
+      cols: Math.max(2, Math.round(box.w / 4.2)),
       seed: (spec.seed % 9973) / 9973,
       color: facadeColor(spec.seed, blog.fresh, blog.dead),
     });
