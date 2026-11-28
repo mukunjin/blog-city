@@ -30,8 +30,9 @@ const RING_FILL = 0.92;
 // share of the city disc taken by the tower lots (footprint + GAP). Tuned
 // against TOWER_SCALE so the blocks fill the grid instead of stretching it.
 // Lowering it is how the city is made to breathe: the radius grows, and with a
-// fixed ring spacing that shows up as more rings, not wider gaps.
-const DENSITY = 0.24;
+// fixed ring spacing that shows up as more rings, not wider gaps. 0.16 buys a
+// fourth ring at today's tower count.
+const DENSITY = 0.16;
 // a tower keeps this much distance from the asphalt edge
 const ROAD_PAD = 4.2;
 const SPOKE_OFFSET = 0.14; // avenues are rotated slightly off the axes
