@@ -11,7 +11,7 @@
     "build": "vite build",
     "build:ci": "node scripts/build-blogs.mjs && vite build",
     "preview": "vite preview --port 3210",
-    "deploy": "npm run build:ci && npx wrangler pages deploy dist --project-name blog-city --branch main",
+    "deploy": "npm run build:ci && wrangler pages deploy dist --project-name blog-city --branch main --commit-dirty=true",
     "sync": "node scripts/sync-health.mjs && node scripts/build-blogs.mjs"
   },
   "dependencies": {
