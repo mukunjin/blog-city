@@ -37,6 +37,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .node-version
+          cache: npm
+
+      - name: Install
+        run: npm ci
 
       - name: Test the sync guards
         run: npm test
@@ -50,6 +54,13 @@ jobs:
 
       - name: Rebuild the city data
         run: node scripts/build-blogs.mjs
+
+      # Everything above can pass while the site itself no longer compiles —
+      # a field the layout reads could go missing, and the deploy would break
+      # the morning after. Build the real thing before committing: a failure
+      # here stops the job, so nothing is pushed and nothing is deployed.
+      - name: Build the site
+        run: npm run build:ci
 
       - name: Commit the snapshot
         id: commit
